@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +28,24 @@ import {
   publishExam,
   removeExamQuestion,
 } from '@/lib/api/exams'
+
+const ASSIGN_CLASS_ERROR_MESSAGE: Record<string, string> = {
+  NOT_YOUR_CLASS: 'Bạn không phụ trách lớp này. Hãy nhờ admin gán lớp thay, hoặc gán bạn làm giáo viên phụ trách lớp trước.',
+  EXAM_NOT_PUBLISHED: 'Đề thi chưa được xuất bản.',
+  CLASS_ALREADY_ASSIGNED: 'Lớp này đã được gán cho đề thi rồi.',
+  INVALID_SCHEDULE: 'Thời gian đóng phải sau thời gian mở.',
+  EXAM_NOT_FOUND: 'Không tìm thấy đề thi.',
+}
+
+function getAssignClassErrorMessage(error: unknown): string {
+  if (isAxiosError<{ error?: { code?: string } }>(error)) {
+    const code = error.response?.data?.error?.code
+    if (code && ASSIGN_CLASS_ERROR_MESSAGE[code]) {
+      return ASSIGN_CLASS_ERROR_MESSAGE[code]
+    }
+  }
+  return 'Không thể gán lớp. Vui lòng thử lại.'
+}
 
 export default function ExamEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -88,7 +107,7 @@ export default function ExamEditorPage() {
       setAssignOpen(false)
       refetchExamClasses()
     },
-    onError: () => toast.error('Không thể gán lớp (kiểm tra bạn có phụ trách lớp này không)'),
+    onError: (error) => toast.error(getAssignClassErrorMessage(error)),
   })
 
   if (!exam) return null

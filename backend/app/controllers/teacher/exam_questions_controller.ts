@@ -19,14 +19,14 @@ async function loadOwnedDraftExam(examId: number, authUser: HttpContext['authUse
 }
 
 export default class ExamQuestionsController {
-  async index({ params, serialize }: HttpContext) {
+  async index({ params }: HttpContext) {
     const examQuestions = await ExamQuestion.query()
       .where('exam_id', params.id)
       .preload('question')
       .orderBy('order_index', 'asc')
 
-    return serialize(
-      examQuestions.map((eq) => ({
+    return {
+      data: examQuestions.map((eq) => ({
         examQuestionId: eq.id,
         questionId: eq.questionId,
         orderIndex: eq.orderIndex,
@@ -37,8 +37,8 @@ export default class ExamQuestionsController {
           difficulty: eq.question.difficulty,
           content: eq.question.content,
         },
-      }))
-    )
+      })),
+    }
   }
 
   async store({ params, request, authUser, response }: HttpContext) {

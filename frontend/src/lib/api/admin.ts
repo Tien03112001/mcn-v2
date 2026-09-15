@@ -41,8 +41,56 @@ export interface Tag {
   slug: string
 }
 
+// Dashboard
+export interface DashboardStats {
+  users: {
+    total: number
+    admin: number
+    teacher: number
+    student: number
+    active: number
+    newLast30Days: number
+  }
+  classes: { total: number }
+  subjects: { total: number }
+  questions: { total: number; easy: number; medium: number; hard: number }
+  exams: { total: number; draft: number; published: number; archived: number }
+  attempts: {
+    total: number
+    inProgress: number
+    submitted: number
+    autoSubmitted: number
+    expired: number
+    last7Days: number
+    averageScore: number | null
+    flagged: number
+  }
+  trend: { date: string; total: number }[]
+  upcomingExamClasses: {
+    id: number
+    examId: number
+    examTitle: string
+    className: string
+    opensAt: string
+    closesAt: string
+  }[]
+  recentAttempts: {
+    id: number
+    studentName: string
+    examTitle: string
+    status: string
+    score: number | null
+    submittedAt: string | null
+  }[]
+}
+
+export async function getDashboardStats() {
+  const { data } = await apiClient.get<{ data: DashboardStats }>('/admin/dashboard')
+  return data.data
+}
+
 // Users
-export async function listUsers(params?: { role?: UserRole; page?: number }) {
+export async function listUsers(params?: { role?: UserRole; page?: number; perPage?: number }) {
   const { data } = await apiClient.get<PaginatedResponse<User>>('/admin/users', { params })
   return data
 }

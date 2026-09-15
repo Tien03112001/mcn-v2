@@ -6,11 +6,14 @@ const ClassesController = () => import('#controllers/admin/classes_controller')
 const SubjectsController = () => import('#controllers/admin/subjects_controller')
 const TopicsController = () => import('#controllers/admin/topics_controller')
 const TagsController = () => import('#controllers/admin/tags_controller')
+const DashboardController = () => import('#controllers/admin/dashboard_controller')
 
 router
   .group(() => {
     router
       .group(() => {
+        router.get('dashboard', [DashboardController, 'index'])
+
         router.get('users', [UsersController, 'index'])
         router.post('users', [UsersController, 'store'])
         router.get('users/:id', [UsersController, 'show'])

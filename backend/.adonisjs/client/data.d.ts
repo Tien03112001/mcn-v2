@@ -6,17 +6,25 @@
 /// <reference path="./manifest.d.ts" />
 import type { InferData, InferVariants } from '@adonisjs/core/types/transformers'
 import type ClassTransformer from '#transformers/class_transformer'
+import type ExamTransformer from '#transformers/exam_transformer'
+import type QuestionTransformer from '#transformers/question_transformer'
 import type SubjectTransformer from '#transformers/subject_transformer'
 import type TagTransformer from '#transformers/tag_transformer'
 import type TopicTransformer from '#transformers/topic_transformer'
 import type UserTransformer from '#transformers/user_transformer'
-import type QuestionTransformer from '#transformers/question_transformer'
-import type ExamTransformer from '#transformers/exam_transformer'
 
 export namespace Data {
   export type Class = InferData<ClassTransformer>
   export namespace Class {
     export type Variants = InferVariants<ClassTransformer>
+  }
+  export type Exam = InferData<ExamTransformer>
+  export namespace Exam {
+    export type Variants = InferVariants<ExamTransformer>
+  }
+  export type Question = InferData<QuestionTransformer>
+  export namespace Question {
+    export type Variants = InferVariants<QuestionTransformer>
   }
   export type Subject = InferData<SubjectTransformer>
   export namespace Subject {
@@ -33,13 +41,5 @@ export namespace Data {
   export type User = InferData<UserTransformer>
   export namespace User {
     export type Variants = InferVariants<UserTransformer>
-  }
-  export type Question = InferData<QuestionTransformer>
-  export namespace Question {
-    export type Variants = InferVariants<QuestionTransformer>
-  }
-  export type Exam = InferData<ExamTransformer>
-  export namespace Exam {
-    export type Variants = InferVariants<ExamTransformer>
   }
 }

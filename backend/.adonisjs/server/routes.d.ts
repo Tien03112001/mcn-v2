@@ -4,6 +4,7 @@ type ParamValue = string | number | bigint | boolean
 
 export type ScannedRoutes = {
   ALL: {
+    'admin.dashboard.index': { paramsTuple?: []; params?: {} }
     'admin.users.index': { paramsTuple?: []; params?: {} }
     'admin.users.store': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -34,7 +35,6 @@ export type ScannedRoutes = {
     'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
     'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
-    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.store': { paramsTuple?: []; params?: {} }
     'teacher.questions.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -59,6 +59,7 @@ export type ScannedRoutes = {
     'teacher.attempts.for_exam': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.attempts.show': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
+    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'auth.login': { paramsTuple?: []; params?: {} }
     'auth.refresh': { paramsTuple?: []; params?: {} }
     'auth.logout': { paramsTuple?: []; params?: {} }
@@ -74,6 +75,7 @@ export type ScannedRoutes = {
     'student.attempts.result': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
   }
   GET: {
+    'admin.dashboard.index': { paramsTuple?: []; params?: {} }
     'admin.users.index': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.classes.index': { paramsTuple?: []; params?: {} }
@@ -83,7 +85,6 @@ export type ScannedRoutes = {
     'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
     'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
-    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.exams.index': { paramsTuple?: []; params?: {} }
@@ -93,6 +94,7 @@ export type ScannedRoutes = {
     'teacher.attempts.for_exam': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.attempts.show': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
+    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'auth.me': { paramsTuple?: []; params?: {} }
     'student.exams.index': { paramsTuple?: []; params?: {} }
     'student.exams.show': { paramsTuple: [ParamValue]; params: {'examClassId': ParamValue} }
@@ -101,6 +103,7 @@ export type ScannedRoutes = {
     'student.attempts.result': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
   }
   HEAD: {
+    'admin.dashboard.index': { paramsTuple?: []; params?: {} }
     'admin.users.index': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.classes.index': { paramsTuple?: []; params?: {} }
@@ -110,7 +113,6 @@ export type ScannedRoutes = {
     'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
     'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
-    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.exams.index': { paramsTuple?: []; params?: {} }
@@ -120,6 +122,7 @@ export type ScannedRoutes = {
     'teacher.attempts.for_exam': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'teacher.attempts.show': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
+    'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'auth.me': { paramsTuple?: []; params?: {} }
     'student.exams.index': { paramsTuple?: []; params?: {} }
     'student.exams.show': { paramsTuple: [ParamValue]; params: {'examClassId': ParamValue} }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, School, BookOpen, Tag } from 'lucide-react'
+import { LayoutDashboard, Users, School, BookOpen, Tag, FileQuestion, ClipboardList } from 'lucide-react'
 import AppLayout, { type NavItem } from '@/components/layout/AppLayout'
 
 const navItems: NavItem[] = [
@@ -7,6 +7,8 @@ const navItems: NavItem[] = [
   { label: 'Lớp học', to: '/admin/classes', icon: School },
   { label: 'Môn học', to: '/admin/subjects', icon: BookOpen },
   { label: 'Tag kỳ thi', to: '/admin/tags', icon: Tag },
+  { label: 'Câu hỏi', to: '/teacher/questions', icon: FileQuestion },
+  { label: 'Đề thi', to: '/teacher/exams', icon: ClipboardList },
 ]
 
 export default function AdminLayout() {

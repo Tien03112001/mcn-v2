@@ -134,14 +134,14 @@ export default class AttemptsController {
     }
   }
 
-  async history({ authUser, serialize }: HttpContext) {
+  async history({ authUser }: HttpContext) {
     const attempts = await ExamAttempt.query()
       .where('student_id', authUser.id)
       .preload('examClass', (q) => q.preload('exam'))
       .orderBy('created_at', 'desc')
 
-    return serialize(
-      attempts.map((a) => ({
+    return {
+      data: attempts.map((a) => ({
         attemptId: a.id,
         examTitle: a.examClass.exam.title,
         status: a.status,
@@ -149,8 +149,8 @@ export default class AttemptsController {
         startedAt: a.startedAt,
         submittedAt: a.submittedAt,
         isFlagged: a.isFlagged,
-      }))
-    )
+      })),
+    }
   }
 
   async result({ params, authUser, response, serialize }: HttpContext) {

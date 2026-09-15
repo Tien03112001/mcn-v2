@@ -10,23 +10,24 @@ export const controllers = {
     Tags: () => import('#controllers/admin/tags_controller'),
     Topics: () => import('#controllers/admin/topics_controller'),
     Users: () => import('#controllers/admin/users_controller'),
+    Dashboard: () => import('#controllers/admin/dashboard_controller'),
   },
   auth: {
     Auth: () => import('#controllers/auth/auth_controller'),
-  },
-  teacher: {
-    Questions: () => import('#controllers/teacher/questions_controller'),
-    Attachments: () => import('#controllers/teacher/attachments_controller'),
-    Exams: () => import('#controllers/teacher/exams_controller'),
-    ExamQuestions: () => import('#controllers/teacher/exam_questions_controller'),
-    ExamClasses: () => import('#controllers/teacher/exam_classes_controller'),
-    Attempts: () => import('#controllers/teacher/attempts_controller'),
   },
   shared: {
     Files: () => import('#controllers/shared/files_controller'),
   },
   student: {
-    Exams: () => import('#controllers/student/exams_controller'),
     Attempts: () => import('#controllers/student/attempts_controller'),
+    Exams: () => import('#controllers/student/exams_controller'),
+  },
+  teacher: {
+    Attachments: () => import('#controllers/teacher/attachments_controller'),
+    Attempts: () => import('#controllers/teacher/attempts_controller'),
+    ExamClasses: () => import('#controllers/teacher/exam_classes_controller'),
+    ExamQuestions: () => import('#controllers/teacher/exam_questions_controller'),
+    Exams: () => import('#controllers/teacher/exams_controller'),
+    Questions: () => import('#controllers/teacher/questions_controller'),
   },
 }

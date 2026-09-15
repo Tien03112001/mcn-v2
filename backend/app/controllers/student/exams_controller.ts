@@ -9,7 +9,7 @@ export default class ExamsController {
    * Lists exams assigned to classes the student belongs to, split into
    * upcoming/open/closed based on server time (never the client's).
    */
-  async index({ request, authUser, serialize }: HttpContext) {
+  async index({ request, authUser }: HttpContext) {
     const status = request.input('status') as 'upcoming' | 'open' | 'closed' | undefined
     const now = DateTime.now()
 
@@ -36,8 +36,8 @@ export default class ExamsController {
       )
     const attemptByExamClassId = new Map(attempts.map((a) => [a.examClassId, a]))
 
-    return serialize(
-      examClasses.map((ec) => ({
+    return {
+      data: examClasses.map((ec) => ({
         examClassId: ec.id,
         examId: ec.examId,
         title: ec.exam.title,
@@ -48,8 +48,8 @@ export default class ExamsController {
         opensAt: ec.opensAt,
         closesAt: ec.closesAt,
         attemptStatus: attemptByExamClassId.get(ec.id)?.status ?? null,
-      }))
-    )
+      })),
+    }
   }
 
   async show({ params, authUser, response, serialize }: HttpContext) {

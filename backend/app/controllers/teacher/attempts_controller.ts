@@ -12,7 +12,7 @@ async function assertOwnsExam(examId: number, authUser: HttpContext['authUser'])
 
 export default class AttemptsController {
   /** Lists every student attempt for one exam, across all assigned classes. */
-  async forExam({ params, authUser, response, serialize }: HttpContext) {
+  async forExam({ params, authUser, response }: HttpContext) {
     const exam = await assertOwnsExam(Number(params.id), authUser)
     if (!exam) {
       return response.notFound({ error: { code: 'EXAM_NOT_FOUND' } })
@@ -24,8 +24,8 @@ export default class AttemptsController {
       .preload('examClass', (q) => q.preload('class'))
       .orderBy('created_at', 'desc')
 
-    return serialize(
-      attempts.map((a) => ({
+    return {
+      data: attempts.map((a) => ({
         attemptId: a.id,
         studentId: a.studentId,
         studentName: a.student.fullName,
@@ -36,8 +36,8 @@ export default class AttemptsController {
         isFlagged: a.isFlagged,
         startedAt: a.startedAt,
         submittedAt: a.submittedAt,
-      }))
-    )
+      })),
+    }
   }
 
   /** Full detail of one student's attempt, including per-question answers. */
@@ -80,7 +80,7 @@ export default class AttemptsController {
   }
 
   /** Proctoring violation timeline for one attempt. */
-  async violations({ params, authUser, response, serialize }: HttpContext) {
+  async violations({ params, authUser, response }: HttpContext) {
     const attempt = await ExamAttempt.query()
       .where('id', params.attemptId)
       .preload('examClass', (q) => q.preload('exam'))
@@ -94,13 +94,13 @@ export default class AttemptsController {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
 
-    return serialize(
-      attempt.violations.map((v) => ({
+    return {
+      data: attempt.violations.map((v) => ({
         id: v.id,
         violationType: v.violationType,
         occurredAt: v.occurredAt,
         clientReportedAt: v.clientReportedAt,
-      }))
-    )
+      })),
+    }
   }
 }

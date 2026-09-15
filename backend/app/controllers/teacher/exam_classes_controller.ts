@@ -14,22 +14,22 @@ async function assertTeacherOwnsClass(authUser: HttpContext['authUser'], classId
 }
 
 export default class ExamClassesController {
-  async index({ params, response, serialize }: HttpContext) {
+  async index({ params, response }: HttpContext) {
     const exam = await Exam.find(params.id)
     if (!exam) {
       return response.notFound({ error: { code: 'EXAM_NOT_FOUND' } })
     }
 
     const examClasses = await ExamClass.query().where('exam_id', exam.id).preload('class')
-    return serialize(
-      examClasses.map((ec) => ({
+    return {
+      data: examClasses.map((ec) => ({
         id: ec.id,
         classId: ec.classId,
         className: ec.class.name,
         opensAt: ec.opensAt,
         closesAt: ec.closesAt,
-      }))
-    )
+      })),
+    }
   }
 
   async store({ params, request, authUser, response }: HttpContext) {
