@@ -1,6 +1,7 @@
 import apiClient from '@/lib/api-client'
 import type { PaginatedResponse } from '@/lib/api/admin'
-import type { Exam, ExamClassAssignment, ExamQuestionSummary } from '@/types/exam'
+import type { Exam, ExamRoomAssignment, ExamQuestionSummary } from '@/types/exam'
+import type { User } from '@/types/user'
 
 export async function listExams() {
   const { data } = await apiClient.get<PaginatedResponse<Exam>>('/teacher/exams')
@@ -52,13 +53,53 @@ export async function removeExamQuestion(examId: number, examQuestionId: number)
   await apiClient.delete(`/teacher/exams/${examId}/questions/${examQuestionId}`)
 }
 
-export async function listExamClasses(examId: number) {
-  const { data } = await apiClient.get<{ data: ExamClassAssignment[] }>(`/teacher/exams/${examId}/classes`)
+export async function listExamRooms(examId: number) {
+  const { data } = await apiClient.get<{ data: ExamRoomAssignment[] }>(`/teacher/exams/${examId}/rooms`)
   return data.data
 }
 
-export async function assignExamClass(examId: number, payload: { classId: number; opensAt: string; closesAt: string }) {
-  const { data } = await apiClient.post<{ data: ExamClassAssignment }>(`/teacher/exams/${examId}/classes`, payload)
+export async function createExamRoom(examId: number, payload: { name: string; opensAt: string; closesAt: string }) {
+  const { data } = await apiClient.post<{ data: ExamRoomAssignment }>(`/teacher/exams/${examId}/rooms`, payload)
+  return data.data
+}
+
+export async function updateExamRoom(
+  examId: number,
+  roomId: number,
+  payload: Partial<{ name: string; opensAt: string; closesAt: string }>
+) {
+  const { data } = await apiClient.patch<{ data: ExamRoomAssignment }>(`/teacher/exams/${examId}/rooms/${roomId}`, payload)
+  return data.data
+}
+
+export async function deleteExamRoom(examId: number, roomId: number) {
+  await apiClient.delete(`/teacher/exams/${examId}/rooms/${roomId}`)
+}
+
+export async function listExamRoomStudents(examId: number, roomId: number) {
+  const { data } = await apiClient.get<{ data: User[] }>(`/teacher/exams/${examId}/rooms/${roomId}/students`)
+  return data.data
+}
+
+export async function addExamRoomStudent(examId: number, roomId: number, studentId: number) {
+  const { data } = await apiClient.post<{ data: User }>(`/teacher/exams/${examId}/rooms/${roomId}/students`, {
+    studentId,
+  })
+  return data.data
+}
+
+export async function removeExamRoomStudent(examId: number, roomId: number, studentId: number) {
+  await apiClient.delete(`/teacher/exams/${examId}/rooms/${roomId}/students/${studentId}`)
+}
+
+export async function importExamRoomStudents(examId: number, roomId: number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await apiClient.post<{ data: { enrolled: number; created: number; skipped: string[] } }>(
+    `/teacher/exams/${examId}/rooms/${roomId}/students/import`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
   return data.data
 }
 
@@ -66,7 +107,7 @@ export interface ExamAttemptSummary {
   attemptId: number
   studentId: number
   studentName: string
-  className: string
+  roomName: string
   status: string
   score: number | null
   violationCount: number

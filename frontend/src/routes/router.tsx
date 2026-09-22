@@ -7,8 +7,6 @@ import ForbiddenPage from '@/pages/ForbiddenPage'
 import AdminLayout from '@/components/layout/AdminLayout'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import UsersPage from '@/pages/admin/UsersPage'
-import ClassesPage from '@/pages/admin/ClassesPage'
-import ClassDetailPage from '@/pages/admin/ClassDetailPage'
 import SubjectsPage from '@/pages/admin/SubjectsPage'
 import TagsPage from '@/pages/admin/TagsPage'
 
@@ -18,6 +16,7 @@ import QuestionBankPage from '@/pages/teacher/QuestionBankPage'
 import QuestionEditorPage from '@/pages/teacher/QuestionEditorPage'
 import ExamsPage from '@/pages/teacher/ExamsPage'
 import ExamEditorPage from '@/pages/teacher/ExamEditorPage'
+import ExamRoomDetailPage from '@/pages/teacher/ExamRoomDetailPage'
 import ExamResultsPage from '@/pages/teacher/ExamResultsPage'
 import AttemptDetailPage from '@/pages/teacher/AttemptDetailPage'
 
@@ -40,8 +39,6 @@ export const router = createBrowserRouter([
         children: [
           { path: '/admin', element: <DashboardPage /> },
           { path: '/admin/users', element: <UsersPage /> },
-          { path: '/admin/classes', element: <ClassesPage /> },
-          { path: '/admin/classes/:id', element: <ClassDetailPage /> },
           { path: '/admin/subjects', element: <SubjectsPage /> },
           { path: '/admin/tags', element: <TagsPage /> },
         ],
@@ -61,6 +58,7 @@ export const router = createBrowserRouter([
           { path: '/teacher/questions/:id', element: <QuestionEditorPage /> },
           { path: '/teacher/exams', element: <ExamsPage /> },
           { path: '/teacher/exams/:id', element: <ExamEditorPage /> },
+          { path: '/teacher/exams/:examId/rooms/:roomId', element: <ExamRoomDetailPage /> },
           { path: '/teacher/exams/:id/results', element: <ExamResultsPage /> },
           { path: '/teacher/attempts/:attemptId', element: <AttemptDetailPage /> },
         ],
@@ -71,7 +69,7 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute allowedRoles={['student']} />,
     children: [
-      { path: '/student/exams/:examClassId/take', element: <ExamTakingPage /> },
+      { path: '/student/exams/:examRoomId/take', element: <ExamTakingPage /> },
       {
         element: <StudentLayout />,
         children: [

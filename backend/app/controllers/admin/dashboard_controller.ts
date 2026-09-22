@@ -20,7 +20,7 @@ export default class DashboardController {
     const [
       usersByRole,
       activeUsers,
-      totalClasses,
+      totalExamRooms,
       totalSubjects,
       questionsByDifficulty,
       examsByStatus,
@@ -30,12 +30,12 @@ export default class DashboardController {
       attemptsLast7Days,
       newUsersLast30Days,
       trendRows,
-      upcomingExamClasses,
+      upcomingExamRooms,
       recentAttempts,
     ] = await Promise.all([
       countBy('users', 'role'),
       db.from('users').where('is_active', true).count('* as total').first(),
-      db.from('classes').count('* as total').first(),
+      db.from('exam_rooms').count('* as total').first(),
       db.from('subjects').count('* as total').first(),
       countBy('questions', 'difficulty'),
       countBy('exams', 'status'),
@@ -60,25 +60,24 @@ export default class DashboardController {
         .groupByRaw("date_trunc('day', created_at)")
         .orderBy('day', 'asc'),
       db
-        .from('exam_classes')
-        .join('exams', 'exams.id', 'exam_classes.exam_id')
-        .join('classes', 'classes.id', 'exam_classes.class_id')
+        .from('exam_rooms')
+        .join('exams', 'exams.id', 'exam_rooms.exam_id')
         .select(
-          'exam_classes.id',
+          'exam_rooms.id',
           'exams.id as examId',
           'exams.title as examTitle',
-          'classes.name as className',
-          'exam_classes.opens_at as opensAt',
-          'exam_classes.closes_at as closesAt'
+          'exam_rooms.name as roomName',
+          'exam_rooms.opens_at as opensAt',
+          'exam_rooms.closes_at as closesAt'
         )
-        .where('exam_classes.opens_at', '>=', now.toSQL()!)
-        .orderBy('exam_classes.opens_at', 'asc')
+        .where('exam_rooms.opens_at', '>=', now.toSQL()!)
+        .orderBy('exam_rooms.opens_at', 'asc')
         .limit(5),
       db
         .from('exam_attempts')
         .join('users', 'users.id', 'exam_attempts.student_id')
-        .join('exam_classes', 'exam_classes.id', 'exam_attempts.exam_class_id')
-        .join('exams', 'exams.id', 'exam_classes.exam_id')
+        .join('exam_rooms', 'exam_rooms.id', 'exam_attempts.exam_room_id')
+        .join('exams', 'exams.id', 'exam_rooms.exam_id')
         .select(
           'exam_attempts.id',
           'users.full_name as studentName',
@@ -101,7 +100,7 @@ export default class DashboardController {
           active: Number(activeUsers?.total ?? 0),
           newLast30Days: Number(newUsersLast30Days?.total ?? 0),
         },
-        classes: { total: Number(totalClasses?.total ?? 0) },
+        examRooms: { total: Number(totalExamRooms?.total ?? 0) },
         subjects: { total: Number(totalSubjects?.total ?? 0) },
         questions: {
           total: Object.values(questionsByDifficulty).reduce((sum, n) => sum + n, 0),
@@ -129,7 +128,7 @@ export default class DashboardController {
           date: DateTime.fromJSDate(new Date(row.day)).toISODate(),
           total: Number(row.total),
         })),
-        upcomingExamClasses,
+        upcomingExamRooms,
         recentAttempts: recentAttempts.map((row: Record<string, unknown>) => ({
           ...row,
           score: row.score === null ? null : Number(row.score),

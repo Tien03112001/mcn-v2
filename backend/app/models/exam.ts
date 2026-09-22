@@ -6,7 +6,7 @@ import User from '#models/user'
 import Tag from '#models/tag'
 import ExamQuestion from '#models/exam_question'
 import ExamVariant from '#models/exam_variant'
-import ExamClass from '#models/exam_class'
+import ExamRoom from '#models/exam_room'
 import FileAttachment from '#models/file_attachment'
 
 export type ExamStatus = 'draft' | 'published' | 'archived'
@@ -43,8 +43,8 @@ export default class Exam extends ExamSchema {
   @hasMany(() => ExamVariant)
   declare variants: HasMany<typeof ExamVariant>
 
-  @hasMany(() => ExamClass)
-  declare examClasses: HasMany<typeof ExamClass>
+  @hasMany(() => ExamRoom)
+  declare examRooms: HasMany<typeof ExamRoom>
 
   @hasMany(() => FileAttachment, { foreignKey: 'examId' })
   declare attachments: HasMany<typeof FileAttachment>

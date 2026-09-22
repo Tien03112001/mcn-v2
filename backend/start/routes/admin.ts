@@ -2,7 +2,6 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
 const UsersController = () => import('#controllers/admin/users_controller')
-const ClassesController = () => import('#controllers/admin/classes_controller')
 const SubjectsController = () => import('#controllers/admin/subjects_controller')
 const TopicsController = () => import('#controllers/admin/topics_controller')
 const TagsController = () => import('#controllers/admin/tags_controller')
@@ -20,18 +19,6 @@ router
         router.patch('users/:id', [UsersController, 'update'])
         router.delete('users/:id', [UsersController, 'destroy'])
         router.post('users/:id/reset-password', [UsersController, 'resetPassword'])
-
-        router.get('classes', [ClassesController, 'index'])
-        router.post('classes', [ClassesController, 'store'])
-        router.get('classes/:id', [ClassesController, 'show'])
-        router.patch('classes/:id', [ClassesController, 'update'])
-        router.delete('classes/:id', [ClassesController, 'destroy'])
-        router.get('classes/:id/students', [ClassesController, 'students'])
-        router.post('classes/:id/students', [ClassesController, 'addStudent'])
-        router.post('classes/:id/students/import', [ClassesController, 'importStudents'])
-        router.delete('classes/:id/students/:studentId', [ClassesController, 'removeStudent'])
-        router.post('classes/:id/teachers', [ClassesController, 'assignTeacher'])
-        router.delete('classes/:id/teachers/:teacherId', [ClassesController, 'removeTeacher'])
 
         router.post('subjects', [SubjectsController, 'store'])
         router.patch('subjects/:id', [SubjectsController, 'update'])

@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import ExamAttempt from '#models/exam_attempt'
-import ExamClass from '#models/exam_class'
+import ExamRoom from '#models/exam_room'
 import ViolationLog, { type ViolationType } from '#models/violation_log'
 import ExamAttemptService, { ExamAttemptError } from '#services/exam_attempt_service'
 
@@ -24,55 +24,63 @@ export default class ViolationService {
     violationType: ViolationType,
     clientReportedAt: DateTime | null
   ): Promise<ViolationResult> {
-    return db.transaction(async (trx) => {
-      const attempt = await ExamAttempt.query({ client: trx }).where('id', attemptId).forUpdate().first()
-      if (!attempt) {
-        throw new ExamAttemptError('ATTEMPT_NOT_FOUND', 'Attempt not found')
-      }
-      if (attempt.status !== 'in_progress') {
-        throw new ExamAttemptError('ATTEMPT_ALREADY_CLOSED', 'This attempt has already been closed')
-      }
+    return db
+      .transaction(async (trx) => {
+        const attempt = await ExamAttempt.query({ client: trx })
+          .where('id', attemptId)
+          .forUpdate()
+          .first()
+        if (!attempt) {
+          throw new ExamAttemptError('ATTEMPT_NOT_FOUND', 'Attempt not found')
+        }
+        if (attempt.status !== 'in_progress') {
+          throw new ExamAttemptError(
+            'ATTEMPT_ALREADY_CLOSED',
+            'This attempt has already been closed'
+          )
+        }
 
-      const examClass = await ExamClass.query({ client: trx })
-        .where('id', attempt.examClassId)
-        .preload('exam')
-        .firstOrFail()
-      const maxViolationCount = examClass.exam.maxViolationCount
+        const examRoom = await ExamRoom.query({ client: trx })
+          .where('id', attempt.examRoomId)
+          .preload('exam')
+          .firstOrFail()
+        const maxViolationCount = examRoom.exam.maxViolationCount
 
-      await ViolationLog.create(
-        {
-          examAttemptId: attempt.id,
-          violationType,
-          occurredAt: DateTime.now(),
-          clientReportedAt,
-          metadata: null,
-        },
-        { client: trx }
-      )
+        await ViolationLog.create(
+          {
+            examAttemptId: attempt.id,
+            violationType,
+            occurredAt: DateTime.now(),
+            clientReportedAt,
+            metadata: null,
+          },
+          { client: trx }
+        )
 
-      attempt.violationCount += 1
-      await attempt.save()
-
-      const shouldAutoSubmit = attempt.violationCount >= maxViolationCount
-
-      if (shouldAutoSubmit) {
-        attempt.isFlagged = true
+        attempt.violationCount += 1
         await attempt.save()
-      }
 
-      return {
-        violationCount: attempt.violationCount,
-        maxViolationCount,
-        autoSubmitted: shouldAutoSubmit,
-      }
-    }).then(async (result) => {
-      // Runs after the violation-count transaction commits, in its own
-      // transaction (submit() takes its own row lock) — keeps the two
-      // concerns (recording vs. grading) independently retryable.
-      if (result.autoSubmitted) {
-        await ExamAttemptService.submit(attemptId, 'auto_submitted')
-      }
-      return result
-    })
+        const shouldAutoSubmit = attempt.violationCount >= maxViolationCount
+
+        if (shouldAutoSubmit) {
+          attempt.isFlagged = true
+          await attempt.save()
+        }
+
+        return {
+          violationCount: attempt.violationCount,
+          maxViolationCount,
+          autoSubmitted: shouldAutoSubmit,
+        }
+      })
+      .then(async (result) => {
+        // Runs after the violation-count transaction commits, in its own
+        // transaction (submit() takes its own row lock) — keeps the two
+        // concerns (recording vs. grading) independently retryable.
+        if (result.autoSubmitted) {
+          await ExamAttemptService.submit(attemptId, 'auto_submitted')
+        }
+        return result
+      })
   }
 }

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Users,
-  School,
+  DoorOpen,
   BookOpen,
   FileQuestion,
   ClipboardList,
@@ -133,7 +133,7 @@ export default function DashboardPage() {
           hint={`${data.users.active} đang hoạt động · +${data.users.newLast30Days} trong 30 ngày`}
           to="/admin/users"
         />
-        <StatCard icon={School} label="Lớp học" value={data.classes.total} to="/admin/classes" />
+        <StatCard icon={DoorOpen} label="Phòng thi" value={data.examRooms.total} to="/teacher/exams" />
         <StatCard icon={BookOpen} label="Môn học" value={data.subjects.total} to="/admin/subjects" />
         <StatCard
           icon={FileQuestion}
@@ -281,17 +281,17 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {data.upcomingExamClasses.length === 0 ? (
+            {data.upcomingExamRooms.length === 0 ? (
               <p className="text-sm text-muted-foreground">Không có kỳ thi nào sắp mở.</p>
             ) : (
-              data.upcomingExamClasses.map((item) => (
+              data.upcomingExamRooms.map((item) => (
                 <Link
                   key={item.id}
                   to={`/teacher/exams/${item.examId}`}
                   className="block rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   <p className="text-sm font-medium">{item.examTitle}</p>
-                  <p className="text-xs text-muted-foreground">Lớp {item.className}</p>
+                  <p className="text-xs text-muted-foreground">Phòng {item.roomName}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Mở lúc {formatDateTime(item.opensAt)} · Đóng lúc {formatDateTime(item.closesAt)}
                   </p>

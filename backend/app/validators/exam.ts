@@ -1,7 +1,5 @@
 import vine from '@vinejs/vine'
 
-const isoDate = () => vine.date({ formats: ['iso8601'] })
-
 export const createExamValidator = vine.create({
   subjectId: vine.number(),
   title: vine.string().maxLength(255),
@@ -30,15 +28,4 @@ export const addExamQuestionValidator = vine.create({
 export const updateExamQuestionValidator = vine.create({
   score: vine.number().min(0).optional(),
   orderIndex: vine.number().optional(),
-})
-
-export const assignExamClassValidator = vine.create({
-  classId: vine.number(),
-  opensAt: isoDate(),
-  closesAt: isoDate(),
-})
-
-export const updateExamClassValidator = vine.create({
-  opensAt: isoDate().optional(),
-  closesAt: isoDate().optional(),
 })

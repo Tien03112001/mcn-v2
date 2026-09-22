@@ -11,16 +11,6 @@ export interface PaginatedResponse<T> {
   }
 }
 
-export interface ClassItem {
-  id: number
-  code: string
-  name: string
-  academicYear: string | null
-  createdBy: number
-  createdAt: string
-  updatedAt: string
-}
-
 export interface Subject {
   id: number
   code: string
@@ -51,7 +41,7 @@ export interface DashboardStats {
     active: number
     newLast30Days: number
   }
-  classes: { total: number }
+  examRooms: { total: number }
   subjects: { total: number }
   questions: { total: number; easy: number; medium: number; hard: number }
   exams: { total: number; draft: number; published: number; archived: number }
@@ -66,11 +56,11 @@ export interface DashboardStats {
     flagged: number
   }
   trend: { date: string; total: number }[]
-  upcomingExamClasses: {
+  upcomingExamRooms: {
     id: number
     examId: number
     examTitle: string
-    className: string
+    roomName: string
     opensAt: string
     closesAt: string
   }[]
@@ -117,51 +107,6 @@ export async function deactivateUser(id: number) {
 
 export async function resetUserPassword(id: number, password: string) {
   await apiClient.post(`/admin/users/${id}/reset-password`, { password })
-}
-
-// Classes
-export async function listClasses(params?: { page?: number }) {
-  const { data } = await apiClient.get<PaginatedResponse<ClassItem>>('/admin/classes', { params })
-  return data
-}
-
-export async function createClass(payload: { code: string; name: string; academicYear?: string }) {
-  const { data } = await apiClient.post<{ data: ClassItem }>('/admin/classes', payload)
-  return data.data
-}
-
-export async function listClassStudents(classId: number) {
-  const { data } = await apiClient.get<{ data: User[] }>(`/admin/classes/${classId}/students`)
-  return data.data
-}
-
-export async function addClassStudent(classId: number, studentId: number) {
-  const { data } = await apiClient.post<{ data: User }>(`/admin/classes/${classId}/students`, { studentId })
-  return data.data
-}
-
-export async function removeClassStudent(classId: number, studentId: number) {
-  await apiClient.delete(`/admin/classes/${classId}/students/${studentId}`)
-}
-
-export async function importClassStudents(classId: number, file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  const { data } = await apiClient.post<{ data: { enrolled: number; created: number; skipped: string[] } }>(
-    `/admin/classes/${classId}/students/import`,
-    formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
-  )
-  return data.data
-}
-
-export async function assignClassTeacher(classId: number, teacherId: number) {
-  const { data } = await apiClient.post<{ data: User }>(`/admin/classes/${classId}/teachers`, { teacherId })
-  return data.data
-}
-
-export async function removeClassTeacher(classId: number, teacherId: number) {
-  await apiClient.delete(`/admin/classes/${classId}/teachers/${teacherId}`)
 }
 
 // Subjects & topics

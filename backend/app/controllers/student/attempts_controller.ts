@@ -9,8 +9,8 @@ import type { AnswerPayload } from '#services/grading_service'
 
 function errorResponse(response: HttpContext['response'], error: ExamAttemptError) {
   const statusByCode: Record<string, number> = {
-    EXAM_CLASS_NOT_FOUND: 404,
-    NOT_ENROLLED: 403,
+    EXAM_ROOM_NOT_FOUND: 404,
+    NOT_IN_ROOM: 403,
     EXAM_NOT_OPEN_YET: 409,
     EXAM_CLOSED: 409,
     ATTEMPT_ALREADY_EXISTS: 409,
@@ -30,7 +30,7 @@ async function loadOwnAttempt(attemptId: number, studentId: number) {
 export default class AttemptsController {
   async start({ params, authUser, response, serialize }: HttpContext) {
     try {
-      const attempt = await ExamAttemptService.start(Number(params.examClassId), authUser.id)
+      const attempt = await ExamAttemptService.start(Number(params.examRoomId), authUser.id)
       const questions = await ExamAttemptService.questionsForAttempt(attempt)
 
       return response.created(
@@ -65,7 +65,10 @@ export default class AttemptsController {
       startedAt: attempt.startedAt,
       deadlineAt: attempt.deadlineAt,
       violationCount: attempt.violationCount,
-      questions: questions.map((q) => ({ ...q, savedAnswer: answersByQuestionId.get(q.questionId) ?? null })),
+      questions: questions.map((q) => ({
+        ...q,
+        savedAnswer: answersByQuestionId.get(q.questionId) ?? null,
+      })),
     })
   }
 
@@ -94,7 +97,8 @@ export default class AttemptsController {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
 
-    const { violationType, clientReportedAt } = await request.validateUsing(reportViolationValidator)
+    const { violationType, clientReportedAt } =
+      await request.validateUsing(reportViolationValidator)
 
     try {
       const result = await ViolationService.recordViolation(
@@ -137,13 +141,13 @@ export default class AttemptsController {
   async history({ authUser }: HttpContext) {
     const attempts = await ExamAttempt.query()
       .where('student_id', authUser.id)
-      .preload('examClass', (q) => q.preload('exam'))
+      .preload('examRoom', (q) => q.preload('exam'))
       .orderBy('created_at', 'desc')
 
     return {
       data: attempts.map((a) => ({
         attemptId: a.id,
-        examTitle: a.examClass.exam.title,
+        examTitle: a.examRoom.exam.title,
         status: a.status,
         score: a.scoreNumber,
         startedAt: a.startedAt,

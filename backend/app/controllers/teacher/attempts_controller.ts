@@ -11,7 +11,7 @@ async function assertOwnsExam(examId: number, authUser: HttpContext['authUser'])
 }
 
 export default class AttemptsController {
-  /** Lists every student attempt for one exam, across all assigned classes. */
+  /** Lists every student attempt for one exam, across all its rooms. */
   async forExam({ params, authUser, response }: HttpContext) {
     const exam = await assertOwnsExam(Number(params.id), authUser)
     if (!exam) {
@@ -19,9 +19,9 @@ export default class AttemptsController {
     }
 
     const attempts = await ExamAttempt.query()
-      .whereHas('examClass', (q) => q.where('exam_id', exam.id))
+      .whereHas('examRoom', (q) => q.where('exam_id', exam.id))
       .preload('student')
-      .preload('examClass', (q) => q.preload('class'))
+      .preload('examRoom')
       .orderBy('created_at', 'desc')
 
     return {
@@ -29,7 +29,7 @@ export default class AttemptsController {
         attemptId: a.id,
         studentId: a.studentId,
         studentName: a.student.fullName,
-        className: a.examClass.class.name,
+        roomName: a.examRoom.name,
         status: a.status,
         score: a.scoreNumber,
         violationCount: a.violationCount,
@@ -45,13 +45,13 @@ export default class AttemptsController {
     const attempt = await ExamAttempt.query()
       .where('id', params.attemptId)
       .preload('student')
-      .preload('examClass', (q) => q.preload('exam'))
+      .preload('examRoom', (q) => q.preload('exam'))
       .first()
 
     if (!attempt) {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
-    if (authUser.role === 'teacher' && attempt.examClass.exam.createdBy !== authUser.id) {
+    if (authUser.role === 'teacher' && attempt.examRoom.exam.createdBy !== authUser.id) {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
 
@@ -83,14 +83,14 @@ export default class AttemptsController {
   async violations({ params, authUser, response }: HttpContext) {
     const attempt = await ExamAttempt.query()
       .where('id', params.attemptId)
-      .preload('examClass', (q) => q.preload('exam'))
+      .preload('examRoom', (q) => q.preload('exam'))
       .preload('violations')
       .first()
 
     if (!attempt) {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
-    if (authUser.role === 'teacher' && attempt.examClass.exam.createdBy !== authUser.id) {
+    if (authUser.role === 'teacher' && attempt.examRoom.exam.createdBy !== authUser.id) {
       return response.notFound({ error: { code: 'ATTEMPT_NOT_FOUND' } })
     }
 

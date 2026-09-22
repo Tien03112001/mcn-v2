@@ -5,7 +5,9 @@ const QuestionsController = () => import('#controllers/teacher/questions_control
 const AttachmentsController = () => import('#controllers/teacher/attachments_controller')
 const ExamsController = () => import('#controllers/teacher/exams_controller')
 const ExamQuestionsController = () => import('#controllers/teacher/exam_questions_controller')
-const ExamClassesController = () => import('#controllers/teacher/exam_classes_controller')
+const ExamRoomsController = () => import('#controllers/teacher/exam_rooms_controller')
+const ExamRoomStudentsController = () =>
+  import('#controllers/teacher/exam_room_students_controller')
 const AttemptsController = () => import('#controllers/teacher/attempts_controller')
 
 router
@@ -30,10 +32,21 @@ router
     router.patch('exams/:id/questions/:examQuestionId', [ExamQuestionsController, 'update'])
     router.delete('exams/:id/questions/:examQuestionId', [ExamQuestionsController, 'destroy'])
 
-    router.get('exams/:id/classes', [ExamClassesController, 'index'])
-    router.post('exams/:id/classes', [ExamClassesController, 'store'])
-    router.patch('exams/:id/classes/:examClassId', [ExamClassesController, 'update'])
-    router.delete('exams/:id/classes/:examClassId', [ExamClassesController, 'destroy'])
+    router.get('exams/:id/rooms', [ExamRoomsController, 'index'])
+    router.post('exams/:id/rooms', [ExamRoomsController, 'store'])
+    router.patch('exams/:id/rooms/:roomId', [ExamRoomsController, 'update'])
+    router.delete('exams/:id/rooms/:roomId', [ExamRoomsController, 'destroy'])
+
+    router.get('exams/:id/rooms/:roomId/students', [ExamRoomStudentsController, 'index'])
+    router.post('exams/:id/rooms/:roomId/students', [ExamRoomStudentsController, 'store'])
+    router.post('exams/:id/rooms/:roomId/students/import', [
+      ExamRoomStudentsController,
+      'importStudents',
+    ])
+    router.delete('exams/:id/rooms/:roomId/students/:studentId', [
+      ExamRoomStudentsController,
+      'destroy',
+    ])
 
     router.get('exams/:id/attempts', [AttemptsController, 'forExam'])
     router.get('attempts/:attemptId', [AttemptsController, 'show'])

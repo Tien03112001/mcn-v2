@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,11 +16,19 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { addClassStudent, importClassStudents, listClassStudents, listUsers, removeClassStudent } from '@/lib/api/admin'
+import { listUsers } from '@/lib/api/admin'
+import {
+  addExamRoomStudent,
+  importExamRoomStudents,
+  listExamRooms,
+  listExamRoomStudents,
+  removeExamRoomStudent,
+} from '@/lib/api/exams'
 
-export default function ClassDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const classId = Number(id)
+export default function ExamRoomDetailPage() {
+  const { examId, roomId } = useParams<{ examId: string; roomId: string }>()
+  const examIdNum = Number(examId)
+  const roomIdNum = Number(roomId)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -27,9 +36,17 @@ export default function ClassDetailPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
   const queryClient = useQueryClient()
 
+  const studentsQueryKey = ['teacher', 'exams', examIdNum, 'rooms', roomIdNum, 'students']
+
+  const { data: rooms } = useQuery({
+    queryKey: ['teacher', 'exams', examIdNum, 'rooms'],
+    queryFn: () => listExamRooms(examIdNum),
+  })
+  const room = rooms?.find((r) => r.id === roomIdNum)
+
   const { data: students, isLoading } = useQuery({
-    queryKey: ['admin', 'classes', classId, 'students'],
-    queryFn: () => listClassStudents(classId),
+    queryKey: studentsQueryKey,
+    queryFn: () => listExamRoomStudents(examIdNum, roomIdNum),
   })
 
   const { data: allStudents } = useQuery({
@@ -51,29 +68,29 @@ export default function ClassDetailPage() {
   })
 
   const removeMutation = useMutation({
-    mutationFn: (studentId: number) => removeClassStudent(classId, studentId),
+    mutationFn: (studentId: number) => removeExamRoomStudent(examIdNum, roomIdNum, studentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'classes', classId, 'students'] })
+      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
     },
   })
 
   const addMutation = useMutation({
-    mutationFn: (studentId: number) => addClassStudent(classId, studentId),
+    mutationFn: (studentId: number) => addExamRoomStudent(examIdNum, roomIdNum, studentId),
     onSuccess: () => {
-      toast.success('Đã thêm sinh viên vào lớp')
+      toast.success('Đã thêm sinh viên vào phòng thi')
       setAddOpen(false)
       setSearch('')
       setSelectedStudentId('')
-      queryClient.invalidateQueries({ queryKey: ['admin', 'classes', classId, 'students'] })
+      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
     },
-    onError: () => toast.error('Không thể thêm sinh viên vào lớp'),
+    onError: () => toast.error('Không thể thêm sinh viên vào phòng thi'),
   })
 
   const importMutation = useMutation({
-    mutationFn: (file: File) => importClassStudents(classId, file),
+    mutationFn: (file: File) => importExamRoomStudents(examIdNum, roomIdNum, file),
     onSuccess: (result) => {
       toast.success(`Import thành công: ${result.created} SV mới, ${result.enrolled} lượt ghi danh`)
-      queryClient.invalidateQueries({ queryKey: ['admin', 'classes', classId, 'students'] })
+      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
     },
     onError: () => toast.error('Import thất bại. Kiểm tra định dạng file Excel.'),
     onSettled: () => setIsImporting(false),
@@ -89,8 +106,19 @@ export default function ClassDetailPage() {
 
   return (
     <div>
+      <Link
+        to={`/teacher/exams/${examIdNum}`}
+        className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" />
+        Quay lại đề thi
+      </Link>
+
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Danh sách sinh viên</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">{room ? `Phòng thi: ${room.name}` : 'Danh sách sinh viên'}</h1>
+          <p className="text-sm text-muted-foreground">Quản lý danh sách sinh viên của phòng thi này.</p>
+        </div>
         <div className="flex gap-2">
           <Dialog
             open={addOpen}
@@ -103,11 +131,11 @@ export default function ClassDetailPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button variant="outline">Thêm sinh viên</Button>
+              <Button variant="outline">Thêm thủ công</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Thêm sinh viên vào lớp</DialogTitle>
+                <DialogTitle>Thêm sinh viên vào phòng thi</DialogTitle>
               </DialogHeader>
               <form
                 className="flex flex-col gap-4"
@@ -155,7 +183,7 @@ export default function ClassDetailPage() {
                 </div>
                 <DialogFooter>
                   <Button type="submit" disabled={!selectedStudentId || addMutation.isPending}>
-                    {addMutation.isPending ? 'Đang thêm...' : 'Thêm vào lớp'}
+                    {addMutation.isPending ? 'Đang thêm...' : 'Thêm vào phòng thi'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -204,7 +232,7 @@ export default function ClassDetailPage() {
                   onClick={() => removeMutation.mutate(student.id)}
                   disabled={removeMutation.isPending}
                 >
-                  Xóa khỏi lớp
+                  Xóa khỏi phòng thi
                 </Button>
               </TableCell>
             </TableRow>

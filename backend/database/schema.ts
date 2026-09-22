@@ -7,38 +7,6 @@
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
-export class ClassStudentSchema extends BaseModel {
-  static $columns = ['classId', 'enrolledAt', 'id', 'studentId'] as const
-  $columns = ClassStudentSchema.$columns
-  @column()
-  declare classId: number
-  @column.dateTime()
-  declare enrolledAt: DateTime
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare studentId: number
-}
-
-export class ClassSchema extends BaseModel {
-  static $columns = ['academicYear', 'code', 'createdAt', 'createdBy', 'id', 'name', 'updatedAt'] as const
-  $columns = ClassSchema.$columns
-  @column()
-  declare academicYear: string | null
-  @column()
-  declare code: string
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare createdBy: number
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare name: string
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime | null
-}
-
 export class ExamAttemptAnswerSchema extends BaseModel {
   static $columns = ['answerPayload', 'answeredAt', 'examAttemptId', 'id', 'isCorrect', 'questionId', 'scoreAwarded'] as const
   $columns = ExamAttemptAnswerSchema.$columns
@@ -59,14 +27,14 @@ export class ExamAttemptAnswerSchema extends BaseModel {
 }
 
 export class ExamAttemptSchema extends BaseModel {
-  static $columns = ['createdAt', 'deadlineAt', 'examClassId', 'examVariantId', 'id', 'isFlagged', 'score', 'startedAt', 'status', 'studentId', 'submittedAt', 'updatedAt', 'violationCount'] as const
+  static $columns = ['createdAt', 'deadlineAt', 'examRoomId', 'examVariantId', 'id', 'isFlagged', 'score', 'startedAt', 'status', 'studentId', 'submittedAt', 'updatedAt', 'violationCount'] as const
   $columns = ExamAttemptSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column.dateTime()
   declare deadlineAt: DateTime
   @column()
-  declare examClassId: number
+  declare examRoomId: number
   @column()
   declare examVariantId: number
   @column({ isPrimary: true })
@@ -89,25 +57,6 @@ export class ExamAttemptSchema extends BaseModel {
   declare violationCount: number
 }
 
-export class ExamClassSchema extends BaseModel {
-  static $columns = ['assignedBy', 'classId', 'closesAt', 'createdAt', 'examId', 'id', 'opensAt'] as const
-  $columns = ExamClassSchema.$columns
-  @column()
-  declare assignedBy: number
-  @column()
-  declare classId: number
-  @column.dateTime()
-  declare closesAt: DateTime
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare examId: number
-  @column({ isPrimary: true })
-  declare id: number
-  @column.dateTime()
-  declare opensAt: DateTime
-}
-
 export class ExamQuestionSchema extends BaseModel {
   static $columns = ['examId', 'id', 'orderIndex', 'questionId', 'score'] as const
   $columns = ExamQuestionSchema.$columns
@@ -121,6 +70,38 @@ export class ExamQuestionSchema extends BaseModel {
   declare questionId: number
   @column()
   declare score: string
+}
+
+export class ExamRoomStudentSchema extends BaseModel {
+  static $columns = ['addedAt', 'examRoomId', 'id', 'studentId'] as const
+  $columns = ExamRoomStudentSchema.$columns
+  @column.dateTime()
+  declare addedAt: DateTime
+  @column()
+  declare examRoomId: number
+  @column({ isPrimary: true })
+  declare id: number
+  @column()
+  declare studentId: number
+}
+
+export class ExamRoomSchema extends BaseModel {
+  static $columns = ['closesAt', 'createdAt', 'createdBy', 'examId', 'id', 'name', 'opensAt'] as const
+  $columns = ExamRoomSchema.$columns
+  @column.dateTime()
+  declare closesAt: DateTime
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare createdBy: number
+  @column()
+  declare examId: number
+  @column({ isPrimary: true })
+  declare id: number
+  @column()
+  declare name: string
+  @column.dateTime()
+  declare opensAt: DateTime
 }
 
 export class ExamTagSchema extends BaseModel {
@@ -319,19 +300,6 @@ export class TagSchema extends BaseModel {
   declare slug: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
-}
-
-export class TeacherClassSchema extends BaseModel {
-  static $columns = ['assignedAt', 'classId', 'id', 'teacherId'] as const
-  $columns = TeacherClassSchema.$columns
-  @column.dateTime()
-  declare assignedAt: DateTime
-  @column()
-  declare classId: number
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare teacherId: number
 }
 
 export class TopicSchema extends BaseModel {

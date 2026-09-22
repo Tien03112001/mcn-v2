@@ -5,12 +5,11 @@
 
 export const controllers = {
   admin: {
-    Classes: () => import('#controllers/admin/classes_controller'),
+    Dashboard: () => import('#controllers/admin/dashboard_controller'),
     Subjects: () => import('#controllers/admin/subjects_controller'),
     Tags: () => import('#controllers/admin/tags_controller'),
     Topics: () => import('#controllers/admin/topics_controller'),
     Users: () => import('#controllers/admin/users_controller'),
-    Dashboard: () => import('#controllers/admin/dashboard_controller'),
   },
   auth: {
     Auth: () => import('#controllers/auth/auth_controller'),
@@ -25,8 +24,9 @@ export const controllers = {
   teacher: {
     Attachments: () => import('#controllers/teacher/attachments_controller'),
     Attempts: () => import('#controllers/teacher/attempts_controller'),
-    ExamClasses: () => import('#controllers/teacher/exam_classes_controller'),
     ExamQuestions: () => import('#controllers/teacher/exam_questions_controller'),
+    ExamRoomStudents: () => import('#controllers/teacher/exam_room_students_controller'),
+    ExamRooms: () => import('#controllers/teacher/exam_rooms_controller'),
     Exams: () => import('#controllers/teacher/exams_controller'),
     Questions: () => import('#controllers/teacher/questions_controller'),
   },

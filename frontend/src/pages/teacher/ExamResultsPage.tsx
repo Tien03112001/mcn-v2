@@ -29,7 +29,7 @@ export default function ExamResultsPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Sinh viên</TableHead>
-            <TableHead>Lớp</TableHead>
+            <TableHead>Phòng thi</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead>Điểm</TableHead>
             <TableHead>Vi phạm</TableHead>
@@ -47,7 +47,7 @@ export default function ExamResultsPage() {
           {attempts?.map((a) => (
             <TableRow key={a.attemptId}>
               <TableCell>{a.studentName}</TableCell>
-              <TableCell>{a.className}</TableCell>
+              <TableCell>{a.roomName}</TableCell>
               <TableCell>{STATUS_LABEL[a.status] ?? a.status}</TableCell>
               <TableCell>{a.score ?? '—'}</TableCell>
               <TableCell>

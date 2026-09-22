@@ -23,8 +23,8 @@ export default function ExamListPage() {
     queryFn: () => listStudentExams(tab),
   })
 
-  function handleStart(examClassId: number) {
-    navigate(`/student/exams/${examClassId}/take`)
+  function handleStart(examRoomId: number) {
+    navigate(`/student/exams/${examRoomId}/take`)
   }
 
   return (
@@ -43,7 +43,7 @@ export default function ExamListPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {exams?.map((exam) => (
-          <Card key={exam.examClassId}>
+          <Card key={exam.examRoomId}>
             <CardHeader>
               <CardTitle className="text-base">{exam.title}</CardTitle>
               <div className="flex flex-wrap gap-1 pt-1">
@@ -65,7 +65,7 @@ export default function ExamListPage() {
                 {exam.attemptStatus ? (
                   <Badge variant="outline">{STATUS_LABEL[exam.attemptStatus] ?? exam.attemptStatus}</Badge>
                 ) : tab === 'open' ? (
-                  <Button size="sm" onClick={() => handleStart(exam.examClassId)}>
+                  <Button size="sm" onClick={() => handleStart(exam.examRoomId)}>
                     Vào thi
                   </Button>
                 ) : (

@@ -1,7 +1,7 @@
 import { ExamAttemptSchema } from '#database/schema'
 import { belongsTo, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
-import ExamClass from '#models/exam_class'
+import ExamRoom from '#models/exam_room'
 import ExamVariant from '#models/exam_variant'
 import User from '#models/user'
 import ExamAttemptAnswer from '#models/exam_attempt_answer'
@@ -23,8 +23,8 @@ export default class ExamAttempt extends ExamAttemptSchema {
     this.score = value === null ? null : (String(value) as unknown as typeof this.score)
   }
 
-  @belongsTo(() => ExamClass)
-  declare examClass: BelongsTo<typeof ExamClass>
+  @belongsTo(() => ExamRoom)
+  declare examRoom: BelongsTo<typeof ExamRoom>
 
   @belongsTo(() => ExamVariant)
   declare examVariant: BelongsTo<typeof ExamVariant>

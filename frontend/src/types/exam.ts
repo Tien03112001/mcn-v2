@@ -38,16 +38,15 @@ export interface ExamQuestionSummary {
   }
 }
 
-export interface ExamClassAssignment {
+export interface ExamRoomAssignment {
   id: number
-  classId: number
-  className?: string
+  name: string
   opensAt: string
   closesAt: string
 }
 
 export interface StudentExamListItem {
-  examClassId: number
+  examRoomId: number
   examId: number
   title: string
   subjectId: number

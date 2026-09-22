@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
-import ExamClass from '#models/exam_class'
+import ExamRoom from '#models/exam_room'
 import ExamAttempt from '#models/exam_attempt'
 import ExamAttemptAnswer from '#models/exam_attempt_answer'
 import ExamQuestion from '#models/exam_question'
@@ -17,59 +17,62 @@ export class ExamAttemptError extends Error {
 
 export default class ExamAttemptService {
   /**
-   * Starts a new attempt for a student against an exam assigned to their
-   * class. All eligibility checks (enrollment, opens/closes window, no
+   * Starts a new attempt for a student against an exam room they belong
+   * to. All eligibility checks (roster membership, opens/closes window, no
    * existing attempt) run inside a transaction to close the race window
    * a double-click/double-tab submit could otherwise exploit.
    */
-  static async start(examClassId: number, studentId: number): Promise<ExamAttempt> {
+  static async start(examRoomId: number, studentId: number): Promise<ExamAttempt> {
     return db.transaction(async (trx) => {
-      const examClass = await ExamClass.query({ client: trx })
-        .where('id', examClassId)
+      const examRoom = await ExamRoom.query({ client: trx })
+        .where('id', examRoomId)
         .preload('exam', (q) => q.preload('variants'))
         .forUpdate()
         .first()
 
-      if (!examClass) {
-        throw new ExamAttemptError('EXAM_CLASS_NOT_FOUND', 'Exam is not assigned to your class')
+      if (!examRoom) {
+        throw new ExamAttemptError('EXAM_ROOM_NOT_FOUND', 'Exam room not found')
       }
 
-      const isEnrolled = await db
-        .from('class_students')
-        .where('class_id', examClass.classId)
+      const isInRoom = await db
+        .from('exam_room_students')
+        .where('exam_room_id', examRoom.id)
         .where('student_id', studentId)
         .useTransaction(trx)
         .first()
-      if (!isEnrolled) {
-        throw new ExamAttemptError('NOT_ENROLLED', 'You are not enrolled in this class')
+      if (!isInRoom) {
+        throw new ExamAttemptError('NOT_IN_ROOM', 'You are not in this exam room')
       }
 
       const now = DateTime.now()
-      if (now < examClass.opensAt) {
+      if (now < examRoom.opensAt) {
         throw new ExamAttemptError('EXAM_NOT_OPEN_YET', 'This exam has not opened yet')
       }
-      if (now > examClass.closesAt) {
+      if (now > examRoom.closesAt) {
         throw new ExamAttemptError('EXAM_CLOSED', 'This exam is closed')
       }
 
       const existing = await ExamAttempt.query({ client: trx })
-        .where('exam_class_id', examClassId)
+        .where('exam_room_id', examRoomId)
         .where('student_id', studentId)
         .first()
       if (existing) {
-        throw new ExamAttemptError('ATTEMPT_ALREADY_EXISTS', 'You have already started or completed this exam')
+        throw new ExamAttemptError(
+          'ATTEMPT_ALREADY_EXISTS',
+          'You have already started or completed this exam'
+        )
       }
 
-      const variant = examClass.exam.variants[0]
+      const variant = examRoom.exam.variants[0]
       if (!variant) {
         throw new ExamAttemptError('EXAM_HAS_NO_VARIANT', 'Exam has not been published correctly')
       }
 
-      const deadlineAt = now.plus({ minutes: examClass.exam.durationMinutes })
+      const deadlineAt = now.plus({ minutes: examRoom.exam.durationMinutes })
 
       const attempt = new ExamAttempt()
       attempt.useTransaction(trx)
-      attempt.examClassId = examClassId
+      attempt.examRoomId = examRoomId
       attempt.examVariantId = variant.id
       attempt.studentId = studentId
       attempt.startedAt = now
@@ -88,10 +91,10 @@ export default class ExamAttemptService {
    * answers stripped out — safe to send to the student while in progress.
    */
   static async questionsForAttempt(attempt: ExamAttempt) {
-    const examClass = await ExamClass.query().where('id', attempt.examClassId).firstOrFail()
+    const examRoom = await ExamRoom.query().where('id', attempt.examRoomId).firstOrFail()
 
     const examQuestions = await ExamQuestion.query()
-      .where('exam_id', examClass.examId)
+      .where('exam_id', examRoom.examId)
       .preload('question', (q) => q.preload('options').preload('parts'))
       .orderBy('order_index', 'asc')
 
@@ -111,7 +114,11 @@ export default class ExamAttemptService {
    * in progress or the deadline has passed — the server clock is the
    * only source of truth, never the client's.
    */
-  static async saveAnswer(attempt: ExamAttempt, questionId: number, payload: AnswerPayload): Promise<void> {
+  static async saveAnswer(
+    attempt: ExamAttempt,
+    questionId: number,
+    payload: AnswerPayload
+  ): Promise<void> {
     this.#assertMutable(attempt)
 
     await ExamAttemptAnswer.updateOrCreate(
@@ -130,7 +137,10 @@ export default class ExamAttemptService {
     finalStatus: 'submitted' | 'auto_submitted' | 'expired' = 'submitted'
   ): Promise<ExamAttempt> {
     return db.transaction(async (trx) => {
-      const attempt = await ExamAttempt.query({ client: trx }).where('id', attemptId).forUpdate().first()
+      const attempt = await ExamAttempt.query({ client: trx })
+        .where('id', attemptId)
+        .forUpdate()
+        .first()
       if (!attempt) {
         throw new ExamAttemptError('ATTEMPT_NOT_FOUND', 'Attempt not found')
       }
@@ -138,13 +148,18 @@ export default class ExamAttemptService {
         throw new ExamAttemptError('ATTEMPT_ALREADY_CLOSED', 'This attempt has already been closed')
       }
 
-      const examClass = await ExamClass.query({ client: trx }).where('id', attempt.examClassId).firstOrFail()
+      const examRoom = await ExamRoom.query({ client: trx })
+        .where('id', attempt.examRoomId)
+        .firstOrFail()
 
       const examQuestions = await ExamQuestion.query({ client: trx })
-        .where('exam_id', examClass.examId)
+        .where('exam_id', examRoom.examId)
         .preload('question', (q) => q.preload('options').preload('parts'))
 
-      const answers = await ExamAttemptAnswer.query({ client: trx }).where('exam_attempt_id', attempt.id)
+      const answers = await ExamAttemptAnswer.query({ client: trx }).where(
+        'exam_attempt_id',
+        attempt.id
+      )
       const answerByQuestionId = new Map(answers.map((a) => [a.questionId, a]))
 
       let totalScore = 0

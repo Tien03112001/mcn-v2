@@ -16,8 +16,8 @@ export async function listStudentExams(status?: 'upcoming' | 'open' | 'closed') 
   return data.data
 }
 
-export async function startAttempt(examClassId: number) {
-  const { data } = await apiClient.post<{ data: AttemptStartResponse }>(`/student/exams/${examClassId}/attempts`)
+export async function startAttempt(examRoomId: number) {
+  const { data } = await apiClient.post<{ data: AttemptStartResponse }>(`/student/exams/${examRoomId}/attempts`)
   return data.data
 }
 

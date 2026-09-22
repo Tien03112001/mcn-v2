@@ -8,9 +8,9 @@ const AttemptsController = () => import('#controllers/student/attempts_controlle
 router
   .group(() => {
     router.get('exams', [ExamsController, 'index'])
-    router.get('exams/:examClassId', [ExamsController, 'show'])
+    router.get('exams/:examRoomId', [ExamsController, 'show'])
 
-    router.post('exams/:examClassId/attempts', [AttemptsController, 'start'])
+    router.post('exams/:examRoomId/attempts', [AttemptsController, 'start'])
     router.get('attempts', [AttemptsController, 'history'])
     router.get('attempts/:attemptId', [AttemptsController, 'show'])
     router.put('attempts/:attemptId/answers/:questionId', [AttemptsController, 'saveAnswer'])

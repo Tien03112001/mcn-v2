@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
@@ -15,36 +15,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { listClasses } from '@/lib/api/admin'
 import { listQuestions } from '@/lib/api/questions'
 import {
   addExamQuestion,
-  assignExamClass,
+  createExamRoom,
   getExam,
-  listExamClasses,
+  listExamRooms,
   listExamQuestions,
   publishExam,
   removeExamQuestion,
 } from '@/lib/api/exams'
 
-const ASSIGN_CLASS_ERROR_MESSAGE: Record<string, string> = {
-  NOT_YOUR_CLASS: 'Bạn không phụ trách lớp này. Hãy nhờ admin gán lớp thay, hoặc gán bạn làm giáo viên phụ trách lớp trước.',
+const CREATE_ROOM_ERROR_MESSAGE: Record<string, string> = {
   EXAM_NOT_PUBLISHED: 'Đề thi chưa được xuất bản.',
-  CLASS_ALREADY_ASSIGNED: 'Lớp này đã được gán cho đề thi rồi.',
   INVALID_SCHEDULE: 'Thời gian đóng phải sau thời gian mở.',
   EXAM_NOT_FOUND: 'Không tìm thấy đề thi.',
+  ROOM_HAS_ATTEMPTS: 'Phòng thi đã có học viên làm bài, không thể xoá.',
 }
 
-function getAssignClassErrorMessage(error: unknown): string {
+function getCreateRoomErrorMessage(error: unknown): string {
   if (isAxiosError<{ error?: { code?: string } }>(error)) {
     const code = error.response?.data?.error?.code
-    if (code && ASSIGN_CLASS_ERROR_MESSAGE[code]) {
-      return ASSIGN_CLASS_ERROR_MESSAGE[code]
+    if (code && CREATE_ROOM_ERROR_MESSAGE[code]) {
+      return CREATE_ROOM_ERROR_MESSAGE[code]
     }
   }
-  return 'Không thể gán lớp. Vui lòng thử lại.'
+  return 'Không thể tạo phòng thi. Vui lòng thử lại.'
 }
 
 export default function ExamEditorPage() {
@@ -54,7 +51,7 @@ export default function ExamEditorPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [scoreDraft, setScoreDraft] = useState('1')
   const [assignOpen, setAssignOpen] = useState(false)
-  const [assignForm, setAssignForm] = useState({ classId: '', opensAt: '', closesAt: '' })
+  const [roomForm, setRoomForm] = useState({ name: '', opensAt: '', closesAt: '' })
 
   const { data: exam } = useQuery({ queryKey: ['teacher', 'exams', examId], queryFn: () => getExam(examId) })
   const { data: examQuestions, refetch: refetchExamQuestions } = useQuery({
@@ -62,10 +59,9 @@ export default function ExamEditorPage() {
     queryFn: () => listExamQuestions(examId),
   })
   const { data: bank } = useQuery({ queryKey: ['teacher', 'questions', 'picker'], queryFn: () => listQuestions() })
-  const { data: classes } = useQuery({ queryKey: ['admin', 'classes'], queryFn: () => listClasses() })
-  const { data: examClasses, refetch: refetchExamClasses } = useQuery({
-    queryKey: ['teacher', 'exams', examId, 'classes'],
-    queryFn: () => listExamClasses(examId),
+  const { data: examRooms, refetch: refetchExamRooms } = useQuery({
+    queryKey: ['teacher', 'exams', examId, 'rooms'],
+    queryFn: () => listExamRooms(examId),
     enabled: exam?.status === 'published',
   })
 
@@ -95,19 +91,20 @@ export default function ExamEditorPage() {
     onError: () => toast.error('Không thể xuất bản (đề cần ít nhất 1 câu hỏi)'),
   })
 
-  const assignMutation = useMutation({
+  const createRoomMutation = useMutation({
     mutationFn: () =>
-      assignExamClass(examId, {
-        classId: Number(assignForm.classId),
-        opensAt: new Date(assignForm.opensAt).toISOString(),
-        closesAt: new Date(assignForm.closesAt).toISOString(),
+      createExamRoom(examId, {
+        name: roomForm.name,
+        opensAt: new Date(roomForm.opensAt).toISOString(),
+        closesAt: new Date(roomForm.closesAt).toISOString(),
       }),
     onSuccess: () => {
-      toast.success('Đã gán lớp')
+      toast.success('Đã tạo phòng thi')
       setAssignOpen(false)
-      refetchExamClasses()
+      setRoomForm({ name: '', opensAt: '', closesAt: '' })
+      refetchExamRooms()
     },
-    onError: (error) => toast.error(getAssignClassErrorMessage(error)),
+    onError: (error) => toast.error(getCreateRoomErrorMessage(error)),
   })
 
   if (!exam) return null
@@ -215,43 +212,37 @@ export default function ExamEditorPage() {
       {exam.status === 'published' && (
         <div className="mt-8">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Lớp được gán</h2>
+            <h2 className="text-lg font-medium">Phòng thi</h2>
             <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">Gán lớp</Button>
+                <Button variant="outline">Tạo phòng thi</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Gán đề thi cho lớp</DialogTitle>
+                  <DialogTitle>Tạo phòng thi cho đề</DialogTitle>
                 </DialogHeader>
                 <form
                   className="flex flex-col gap-4"
                   onSubmit={(e) => {
                     e.preventDefault()
-                    assignMutation.mutate()
+                    createRoomMutation.mutate()
                   }}
                 >
                   <div className="flex flex-col gap-2">
-                    <Label>Lớp</Label>
-                    <Select value={assignForm.classId} onValueChange={(v) => setAssignForm((f) => ({ ...f, classId: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn lớp" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes?.data.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Tên phòng thi</Label>
+                    <Input
+                      placeholder="VD: Phòng A1, Ca sáng..."
+                      value={roomForm.name}
+                      onChange={(e) => setRoomForm((f) => ({ ...f, name: e.target.value }))}
+                      required
+                    />
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>Mở lúc</Label>
                     <Input
                       type="datetime-local"
-                      value={assignForm.opensAt}
-                      onChange={(e) => setAssignForm((f) => ({ ...f, opensAt: e.target.value }))}
+                      value={roomForm.opensAt}
+                      onChange={(e) => setRoomForm((f) => ({ ...f, opensAt: e.target.value }))}
                       required
                     />
                   </div>
@@ -259,14 +250,14 @@ export default function ExamEditorPage() {
                     <Label>Đóng lúc</Label>
                     <Input
                       type="datetime-local"
-                      value={assignForm.closesAt}
-                      onChange={(e) => setAssignForm((f) => ({ ...f, closesAt: e.target.value }))}
+                      value={roomForm.closesAt}
+                      onChange={(e) => setRoomForm((f) => ({ ...f, closesAt: e.target.value }))}
                       required
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={assignMutation.isPending || !assignForm.classId}>
-                      Gán
+                    <Button type="submit" disabled={createRoomMutation.isPending || !roomForm.name}>
+                      Tạo phòng thi
                     </Button>
                   </DialogFooter>
                 </form>
@@ -277,17 +268,26 @@ export default function ExamEditorPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Lớp</TableHead>
+                <TableHead>Tên phòng</TableHead>
                 <TableHead>Mở lúc</TableHead>
                 <TableHead>Đóng lúc</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {examClasses?.map((ec) => (
-                <TableRow key={ec.id}>
-                  <TableCell>{ec.className}</TableCell>
-                  <TableCell>{new Date(ec.opensAt).toLocaleString('vi-VN')}</TableCell>
-                  <TableCell>{new Date(ec.closesAt).toLocaleString('vi-VN')}</TableCell>
+              {examRooms?.map((room) => (
+                <TableRow key={room.id}>
+                  <TableCell>{room.name}</TableCell>
+                  <TableCell>{new Date(room.opensAt).toLocaleString('vi-VN')}</TableCell>
+                  <TableCell>{new Date(room.closesAt).toLocaleString('vi-VN')}</TableCell>
+                  <TableCell>
+                    <Link
+                      to={`/teacher/exams/${examId}/rooms/${room.id}`}
+                      className="text-sm text-primary underline-offset-4 hover:underline"
+                    >
+                      Chi tiết
+                    </Link>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

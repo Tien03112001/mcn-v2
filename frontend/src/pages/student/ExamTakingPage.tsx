@@ -27,14 +27,14 @@ import type { AnswerPayload } from '@/types/attempt'
 const AUTOSAVE_DEBOUNCE_MS = 400
 
 export default function ExamTakingPage() {
-  const { examClassId } = useParams<{ examClassId: string }>()
+  const { examRoomId } = useParams<{ examRoomId: string }>()
   const navigate = useNavigate()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<number, AnswerPayload>>({})
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
   const startMutation = useMutation({
-    mutationFn: () => startAttempt(Number(examClassId)),
+    mutationFn: () => startAttempt(Number(examRoomId)),
     onError: (error: unknown) => {
       const code = (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       toast.error(code === 'ATTEMPT_ALREADY_EXISTS' ? 'Bạn đã làm bài thi này rồi' : 'Không thể bắt đầu làm bài')
