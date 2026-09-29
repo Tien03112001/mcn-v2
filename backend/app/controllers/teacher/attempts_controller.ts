@@ -12,20 +12,24 @@ async function assertOwnsExam(examId: number, authUser: HttpContext['authUser'])
 
 export default class AttemptsController {
   /** Lists every student attempt for one exam, across all its rooms. */
-  async forExam({ params, authUser, response }: HttpContext) {
+  async forExam({ params, request, authUser, response }: HttpContext) {
     const exam = await assertOwnsExam(Number(params.id), authUser)
     if (!exam) {
       return response.notFound({ error: { code: 'EXAM_NOT_FOUND' } })
     }
+
+    const page = request.input('page', 1)
+    const perPage = request.input('perPage', 20)
 
     const attempts = await ExamAttempt.query()
       .whereHas('examRoom', (q) => q.where('exam_id', exam.id))
       .preload('student')
       .preload('examRoom')
       .orderBy('created_at', 'desc')
+      .paginate(page, perPage)
 
     return {
-      data: attempts.map((a) => ({
+      data: attempts.all().map((a) => ({
         attemptId: a.id,
         studentId: a.studentId,
         studentName: a.student.fullName,
@@ -37,6 +41,7 @@ export default class AttemptsController {
         startedAt: a.startedAt,
         submittedAt: a.submittedAt,
       })),
+      metadata: attempts.getMeta(),
     }
   }
 

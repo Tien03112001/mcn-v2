@@ -23,10 +23,7 @@ export default defineConfig({
   | will be scanned automatically from the "./commands" directory.
   |
   */
-  commands: [
-    () => import('@adonisjs/core/commands'),
-    () => import('@adonisjs/lucid/commands'),
-  ],
+  commands: [() => import('@adonisjs/core/commands'), () => import('@adonisjs/lucid/commands')],
 
   /*
   |--------------------------------------------------------------------------
@@ -49,7 +46,7 @@ export default defineConfig({
     () => import('@adonisjs/cors/cors_provider'),
     () => import('#providers/api_provider'),
     () => import('@adonisjs/redis/redis_provider'),
-    () => import('@adonisjs/limiter/limiter_provider')
+    () => import('@adonisjs/limiter/limiter_provider'),
   ],
 
   /*
@@ -69,6 +66,7 @@ export default defineConfig({
     () => import('#start/routes/teacher'),
     () => import('#start/routes/student'),
     () => import('#start/routes/files'),
+    () => import('#start/routes/documents'),
   ],
 
   /*

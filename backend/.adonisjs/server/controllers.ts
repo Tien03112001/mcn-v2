@@ -15,6 +15,7 @@ export const controllers = {
     Auth: () => import('#controllers/auth/auth_controller'),
   },
   shared: {
+    Documents: () => import('#controllers/shared/documents_controller'),
     Files: () => import('#controllers/shared/files_controller'),
   },
   student: {
@@ -24,6 +25,7 @@ export const controllers = {
   teacher: {
     Attachments: () => import('#controllers/teacher/attachments_controller'),
     Attempts: () => import('#controllers/teacher/attempts_controller'),
+    Dashboard: () => import('#controllers/teacher/dashboard_controller'),
     ExamQuestions: () => import('#controllers/teacher/exam_questions_controller'),
     ExamRoomStudents: () => import('#controllers/teacher/exam_room_students_controller'),
     ExamRooms: () => import('#controllers/teacher/exam_rooms_controller'),

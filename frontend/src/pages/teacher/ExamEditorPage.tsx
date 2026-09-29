@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,10 +15,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
+import { PaginationControls } from '@/components/common/PaginationControls'
 import { listQuestions } from '@/lib/api/questions'
+import { getErrorMessage } from '@/lib/api-error'
 import {
   addExamQuestion,
   createExamRoom,
+  deleteExamRoom,
   getExam,
   listExamRooms,
   listExamQuestions,
@@ -31,17 +34,10 @@ const CREATE_ROOM_ERROR_MESSAGE: Record<string, string> = {
   EXAM_NOT_PUBLISHED: 'Đề thi chưa được xuất bản.',
   INVALID_SCHEDULE: 'Thời gian đóng phải sau thời gian mở.',
   EXAM_NOT_FOUND: 'Không tìm thấy đề thi.',
-  ROOM_HAS_ATTEMPTS: 'Phòng thi đã có học viên làm bài, không thể xoá.',
 }
 
-function getCreateRoomErrorMessage(error: unknown): string {
-  if (isAxiosError<{ error?: { code?: string } }>(error)) {
-    const code = error.response?.data?.error?.code
-    if (code && CREATE_ROOM_ERROR_MESSAGE[code]) {
-      return CREATE_ROOM_ERROR_MESSAGE[code]
-    }
-  }
-  return 'Không thể tạo phòng thi. Vui lòng thử lại.'
+const DELETE_ROOM_ERROR_MESSAGE: Record<string, string> = {
+  ROOM_HAS_ATTEMPTS: 'Phòng thi đã có học viên làm bài, không thể xoá.',
 }
 
 export default function ExamEditorPage() {
@@ -49,6 +45,7 @@ export default function ExamEditorPage() {
   const examId = Number(id)
   const queryClient = useQueryClient()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [bankPage, setBankPage] = useState(1)
   const [scoreDraft, setScoreDraft] = useState('1')
   const [assignOpen, setAssignOpen] = useState(false)
   const [roomForm, setRoomForm] = useState({ name: '', opensAt: '', closesAt: '' })
@@ -58,7 +55,11 @@ export default function ExamEditorPage() {
     queryKey: ['teacher', 'exams', examId, 'questions'],
     queryFn: () => listExamQuestions(examId),
   })
-  const { data: bank } = useQuery({ queryKey: ['teacher', 'questions', 'picker'], queryFn: () => listQuestions() })
+  const { data: bank } = useQuery({
+    queryKey: ['teacher', 'questions', 'picker', bankPage],
+    queryFn: () => listQuestions({ page: bankPage }),
+    enabled: pickerOpen,
+  })
   const { data: examRooms, refetch: refetchExamRooms } = useQuery({
     queryKey: ['teacher', 'exams', examId, 'rooms'],
     queryFn: () => listExamRooms(examId),
@@ -104,7 +105,16 @@ export default function ExamEditorPage() {
       setRoomForm({ name: '', opensAt: '', closesAt: '' })
       refetchExamRooms()
     },
-    onError: (error) => toast.error(getCreateRoomErrorMessage(error)),
+    onError: (error) => toast.error(getErrorMessage(error, CREATE_ROOM_ERROR_MESSAGE, 'Không thể tạo phòng thi. Vui lòng thử lại.')),
+  })
+
+  const deleteRoomMutation = useMutation({
+    mutationFn: (roomId: number) => deleteExamRoom(examId, roomId),
+    onSuccess: () => {
+      toast.success('Đã xóa phòng thi')
+      refetchExamRooms()
+    },
+    onError: (error) => toast.error(getErrorMessage(error, DELETE_ROOM_ERROR_MESSAGE, 'Không thể xóa phòng thi')),
   })
 
   if (!exam) return null
@@ -133,7 +143,13 @@ export default function ExamEditorPage() {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">Câu hỏi trong đề ({examQuestions?.length ?? 0})</h2>
         {isDraft && (
-          <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+          <Dialog
+            open={pickerOpen}
+            onOpenChange={(open) => {
+              setPickerOpen(open)
+              if (open) setBankPage(1)
+            }}
+          >
             <DialogTrigger asChild>
               <Button variant="outline">Thêm câu hỏi</Button>
             </DialogTrigger>
@@ -173,6 +189,15 @@ export default function ExamEditorPage() {
                   </TableBody>
                 </Table>
               </div>
+              {bank && (
+                <PaginationControls
+                  currentPage={bank.metadata.currentPage}
+                  lastPage={bank.metadata.lastPage}
+                  total={bank.metadata.total}
+                  perPage={bank.metadata.perPage}
+                  onPageChange={setBankPage}
+                />
+              )}
             </DialogContent>
           </Dialog>
         )}
@@ -281,12 +306,20 @@ export default function ExamEditorPage() {
                   <TableCell>{new Date(room.opensAt).toLocaleString('vi-VN')}</TableCell>
                   <TableCell>{new Date(room.closesAt).toLocaleString('vi-VN')}</TableCell>
                   <TableCell>
-                    <Link
-                      to={`/teacher/exams/${examId}/rooms/${room.id}`}
-                      className="text-sm text-primary underline-offset-4 hover:underline"
-                    >
-                      Chi tiết
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        to={`/teacher/exams/${examId}/rooms/${room.id}`}
+                        className="text-sm text-primary underline-offset-4 hover:underline"
+                      >
+                        Chi tiết
+                      </Link>
+                      <ConfirmDeleteButton
+                        title={`Xóa phòng thi "${room.name}"?`}
+                        description="Toàn bộ danh sách sinh viên của phòng này sẽ bị xóa theo. Hành động này không thể hoàn tác."
+                        pending={deleteRoomMutation.isPending}
+                        onConfirm={() => deleteRoomMutation.mutate(room.id)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

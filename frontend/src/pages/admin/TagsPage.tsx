@@ -59,7 +59,7 @@ export default function TagsPage() {
             {tag.name}
             <button
               onClick={() => deleteMutation.mutate(tag.id)}
-              className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+              className="cursor-pointer rounded-full p-0.5 hover:bg-muted-foreground/20"
               aria-label={`Xóa tag ${tag.name}`}
             >
               <X className="size-3" />

@@ -100,7 +100,12 @@ export default class ExamsController {
       return response.notFound({ error: { code: 'EXAM_NOT_FOUND' } })
     }
 
-    await exam.delete()
+    try {
+      await exam.delete()
+    } catch {
+      return response.conflict({ error: { code: 'EXAM_HAS_ATTEMPTS' } })
+    }
+
     return response.noContent()
   }
 

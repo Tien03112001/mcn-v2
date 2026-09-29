@@ -20,7 +20,7 @@ export default function QuestionNavigator({
           key={i}
           onClick={() => onSelect(i)}
           className={cn(
-            'flex size-9 items-center justify-center rounded-md border text-sm font-medium',
+            'flex size-9 cursor-pointer items-center justify-center rounded-md border text-sm font-medium',
             currentIndex === i && 'border-primary ring-2 ring-primary/30',
             answeredIndexes.has(i) ? 'bg-primary/10 text-primary' : 'bg-background text-muted-foreground'
           )}

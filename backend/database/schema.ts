@@ -7,6 +7,31 @@
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
+export class DocumentSchema extends BaseModel {
+  static $columns = ['category', 'createdAt', 'description', 'fileName', 'id', 'mimeType', 'sizeBytes', 'storedPath', 'title', 'uploadedBy'] as const
+  $columns = DocumentSchema.$columns
+  @column()
+  declare category: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare description: string | null
+  @column()
+  declare fileName: string
+  @column({ isPrimary: true })
+  declare id: number
+  @column()
+  declare mimeType: string | null
+  @column()
+  declare sizeBytes: bigint | number | null
+  @column()
+  declare storedPath: string
+  @column()
+  declare title: string
+  @column()
+  declare uploadedBy: number
+}
+
 export class ExamAttemptAnswerSchema extends BaseModel {
   static $columns = ['answerPayload', 'answeredAt', 'examAttemptId', 'id', 'isCorrect', 'questionId', 'scoreAwarded'] as const
   $columns = ExamAttemptAnswerSchema.$columns

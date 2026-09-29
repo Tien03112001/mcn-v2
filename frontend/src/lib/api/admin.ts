@@ -120,6 +120,10 @@ export async function createSubject(payload: { code: string; name: string; descr
   return data.data
 }
 
+export async function deleteSubject(id: number) {
+  await apiClient.delete(`/admin/subjects/${id}`)
+}
+
 export async function listTopics(subjectId: number) {
   const { data } = await apiClient.get<{ data: Topic[] }>(`/admin/subjects/${subjectId}/topics`)
   return data.data

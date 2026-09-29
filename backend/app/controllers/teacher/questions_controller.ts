@@ -163,7 +163,12 @@ export default class QuestionsController {
       return response.notFound({ error: { code: 'QUESTION_NOT_FOUND' } })
     }
 
-    await question.delete()
+    try {
+      await question.delete()
+    } catch {
+      return response.conflict({ error: { code: 'QUESTION_IN_USE' } })
+    }
+
     return response.noContent()
   }
 }

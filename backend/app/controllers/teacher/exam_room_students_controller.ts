@@ -18,14 +18,21 @@ async function loadOwnedRoom(examId: number, roomId: number, authUser: HttpConte
 }
 
 export default class ExamRoomStudentsController {
-  async index({ params, authUser, response, serialize }: HttpContext) {
+  async index({ params, request, authUser, response, serialize }: HttpContext) {
     const room = await loadOwnedRoom(Number(params.id), Number(params.roomId), authUser)
     if (!room) {
       return response.notFound({ error: { code: 'EXAM_ROOM_NOT_FOUND' } })
     }
 
-    const students = await room.related('students').query().orderBy('full_name', 'asc')
-    return serialize(UserTransformer.transform(students))
+    const page = request.input('page', 1)
+    const perPage = request.input('perPage', 20)
+
+    const students = await room
+      .related('students')
+      .query()
+      .orderBy('full_name', 'asc')
+      .paginate(page, perPage)
+    return serialize(UserTransformer.paginate(students.all(), students.getMeta()))
   }
 
   async store({ params, request, authUser, response, serialize }: HttpContext) {

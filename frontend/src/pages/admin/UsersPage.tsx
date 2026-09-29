@@ -15,7 +15,9 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { createUser, listUsers } from '@/lib/api/admin'
+import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
+import { PaginationControls } from '@/components/common/PaginationControls'
+import { createUser, deactivateUser, listUsers, updateUser } from '@/lib/api/admin'
 import type { UserRole } from '@/types/user'
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -26,12 +28,13 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
+  const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'users', roleFilter],
-    queryFn: () => listUsers(roleFilter === 'all' ? undefined : { role: roleFilter }),
+    queryKey: ['admin', 'users', roleFilter, page],
+    queryFn: () => listUsers({ role: roleFilter === 'all' ? undefined : roleFilter, page }),
   })
 
   const [form, setForm] = useState({ fullName: '', email: '', password: '', role: 'student' as UserRole, studentCode: '' })
@@ -49,6 +52,24 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
     onError: () => toast.error('Không thể tạo người dùng'),
+  })
+
+  const deactivateMutation = useMutation({
+    mutationFn: (id: number) => deactivateUser(id),
+    onSuccess: () => {
+      toast.success('Đã vô hiệu hóa người dùng')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+    },
+    onError: () => toast.error('Không thể vô hiệu hóa người dùng'),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: number) => updateUser(id, { isActive: true }),
+    onSuccess: () => {
+      toast.success('Đã kích hoạt lại người dùng')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+    },
+    onError: () => toast.error('Không thể kích hoạt lại người dùng'),
   })
 
   return (
@@ -130,7 +151,13 @@ export default function UsersPage() {
       </div>
 
       <div className="mb-4 w-48">
-        <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as UserRole | 'all')}>
+        <Select
+          value={roleFilter}
+          onValueChange={(v) => {
+            setRoleFilter(v as UserRole | 'all')
+            setPage(1)
+          }}
+        >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -151,12 +178,13 @@ export default function UsersPage() {
             <TableHead>Vai trò</TableHead>
             <TableHead>Mã SV</TableHead>
             <TableHead>Trạng thái</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Đang tải...
               </TableCell>
             </TableRow>
@@ -172,10 +200,40 @@ export default function UsersPage() {
                   {user.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
                 </Badge>
               </TableCell>
+              <TableCell>
+                {user.isActive ? (
+                  <ConfirmDeleteButton
+                    label="Vô hiệu hóa"
+                    title={`Vô hiệu hóa "${user.fullName}"?`}
+                    description="Người dùng sẽ không thể đăng nhập cho đến khi được kích hoạt lại."
+                    pending={deactivateMutation.isPending}
+                    onConfirm={() => deactivateMutation.mutate(user.id)}
+                  />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={reactivateMutation.isPending}
+                    onClick={() => reactivateMutation.mutate(user.id)}
+                  >
+                    Kích hoạt lại
+                  </Button>
+                )}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {data && (
+        <PaginationControls
+          currentPage={data.metadata.currentPage}
+          lastPage={data.metadata.lastPage}
+          total={data.metadata.total}
+          perPage={data.metadata.perPage}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { PaginationControls } from '@/components/common/PaginationControls'
 import { listUsers } from '@/lib/api/admin'
 import {
   addExamRoomStudent,
@@ -34,9 +35,11 @@ export default function ExamRoomDetailPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
+  const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
 
-  const studentsQueryKey = ['teacher', 'exams', examIdNum, 'rooms', roomIdNum, 'students']
+  const studentsBaseKey = ['teacher', 'exams', examIdNum, 'rooms', roomIdNum, 'students']
+  const studentsQueryKey = [...studentsBaseKey, page]
 
   const { data: rooms } = useQuery({
     queryKey: ['teacher', 'exams', examIdNum, 'rooms'],
@@ -44,9 +47,18 @@ export default function ExamRoomDetailPage() {
   })
   const room = rooms?.find((r) => r.id === roomIdNum)
 
-  const { data: students, isLoading } = useQuery({
+  const { data: studentsPage, isLoading } = useQuery({
     queryKey: studentsQueryKey,
-    queryFn: () => listExamRoomStudents(examIdNum, roomIdNum),
+    queryFn: () => listExamRoomStudents(examIdNum, roomIdNum, { page }),
+  })
+  const students = studentsPage?.data
+
+  // Full (unpaginated) roster, fetched only while the add-student dialog is
+  // open, so "already enrolled" filtering isn't limited to the current page.
+  const { data: allEnrolled } = useQuery({
+    queryKey: ['teacher', 'exams', examIdNum, 'rooms', roomIdNum, 'students', 'all'],
+    queryFn: () => listExamRoomStudents(examIdNum, roomIdNum, { perPage: 1000 }),
+    enabled: addOpen,
   })
 
   const { data: allStudents } = useQuery({
@@ -55,7 +67,7 @@ export default function ExamRoomDetailPage() {
     enabled: addOpen,
   })
 
-  const enrolledIds = new Set(students?.map((s) => s.id))
+  const enrolledIds = new Set(allEnrolled?.data.map((s) => s.id))
   const availableStudents = (allStudents?.data ?? []).filter((s) => !enrolledIds.has(s.id))
   const filteredStudents = availableStudents.filter((s) => {
     const q = search.trim().toLowerCase()
@@ -70,7 +82,7 @@ export default function ExamRoomDetailPage() {
   const removeMutation = useMutation({
     mutationFn: (studentId: number) => removeExamRoomStudent(examIdNum, roomIdNum, studentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
+      queryClient.invalidateQueries({ queryKey: studentsBaseKey })
     },
   })
 
@@ -81,7 +93,7 @@ export default function ExamRoomDetailPage() {
       setAddOpen(false)
       setSearch('')
       setSelectedStudentId('')
-      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
+      queryClient.invalidateQueries({ queryKey: studentsBaseKey })
     },
     onError: () => toast.error('Không thể thêm sinh viên vào phòng thi'),
   })
@@ -90,7 +102,7 @@ export default function ExamRoomDetailPage() {
     mutationFn: (file: File) => importExamRoomStudents(examIdNum, roomIdNum, file),
     onSuccess: (result) => {
       toast.success(`Import thành công: ${result.created} SV mới, ${result.enrolled} lượt ghi danh`)
-      queryClient.invalidateQueries({ queryKey: studentsQueryKey })
+      queryClient.invalidateQueries({ queryKey: studentsBaseKey })
     },
     onError: () => toast.error('Import thất bại. Kiểm tra định dạng file Excel.'),
     onSettled: () => setIsImporting(false),
@@ -239,6 +251,16 @@ export default function ExamRoomDetailPage() {
           ))}
         </TableBody>
       </Table>
+
+      {studentsPage && (
+        <PaginationControls
+          currentPage={studentsPage.metadata.currentPage}
+          lastPage={studentsPage.metadata.lastPage}
+          total={studentsPage.metadata.total}
+          perPage={studentsPage.metadata.perPage}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }

@@ -9,9 +9,12 @@ const ExamRoomsController = () => import('#controllers/teacher/exam_rooms_contro
 const ExamRoomStudentsController = () =>
   import('#controllers/teacher/exam_room_students_controller')
 const AttemptsController = () => import('#controllers/teacher/attempts_controller')
+const DashboardController = () => import('#controllers/teacher/dashboard_controller')
 
 router
   .group(() => {
+    router.get('dashboard', [DashboardController, 'index'])
+
     router.get('questions', [QuestionsController, 'index'])
     router.post('questions', [QuestionsController, 'store'])
     router.get('questions/:id', [QuestionsController, 'show'])

@@ -3,14 +3,14 @@ import ProtectedRoute from '@/routes/ProtectedRoute'
 import HomePage from '@/pages/landing/HomePage'
 import LoginPage from '@/pages/auth/LoginPage'
 import ForbiddenPage from '@/pages/ForbiddenPage'
+import DocumentsPage from '@/pages/DocumentsPage'
 
-import AdminLayout from '@/components/layout/AdminLayout'
+import StaffLayout from '@/components/layout/StaffLayout'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import UsersPage from '@/pages/admin/UsersPage'
 import SubjectsPage from '@/pages/admin/SubjectsPage'
 import TagsPage from '@/pages/admin/TagsPage'
 
-import TeacherLayout from '@/components/layout/TeacherLayout'
 import TeacherDashboardPage from '@/pages/teacher/DashboardPage'
 import QuestionBankPage from '@/pages/teacher/QuestionBankPage'
 import QuestionEditorPage from '@/pages/teacher/QuestionEditorPage'
@@ -35,7 +35,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute allowedRoles={['admin']} />,
     children: [
       {
-        element: <AdminLayout />,
+        element: <StaffLayout />,
         children: [
           { path: '/admin', element: <DashboardPage /> },
           { path: '/admin/users', element: <UsersPage /> },
@@ -50,9 +50,10 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute allowedRoles={['teacher', 'admin']} />,
     children: [
       {
-        element: <TeacherLayout />,
+        element: <StaffLayout />,
         children: [
           { path: '/teacher', element: <TeacherDashboardPage /> },
+          { path: '/documents', element: <DocumentsPage /> },
           { path: '/teacher/questions', element: <QuestionBankPage /> },
           { path: '/teacher/questions/new', element: <QuestionEditorPage /> },
           { path: '/teacher/questions/:id', element: <QuestionEditorPage /> },
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
         element: <StudentLayout />,
         children: [
           { path: '/student', element: <ExamListPage /> },
+          { path: '/documents', element: <DocumentsPage /> },
           { path: '/student/history', element: <AttemptHistoryPage /> },
           { path: '/student/attempts/:attemptId/result', element: <ExamResultPage /> },
         ],

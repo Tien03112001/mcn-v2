@@ -16,9 +16,16 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
+import { PaginationControls } from '@/components/common/PaginationControls'
 import { listSubjects } from '@/lib/api/admin'
-import { createExam, listExams } from '@/lib/api/exams'
+import { createExam, deleteExam, listExams } from '@/lib/api/exams'
+import { getErrorMessage } from '@/lib/api-error'
 import type { ExamStatus } from '@/types/exam'
+
+const DELETE_EXAM_ERROR: Record<string, string> = {
+  EXAM_HAS_ATTEMPTS: 'Không thể xóa: đề thi này đã có học viên làm bài.',
+}
 
 const STATUS_LABEL: Record<ExamStatus, string> = {
   draft: 'Nháp',
@@ -35,11 +42,15 @@ const STATUS_VARIANT: Record<ExamStatus, 'secondary' | 'default' | 'outline'> = 
 export default function ExamsPage() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(1)
   const [form, setForm] = useState({ subjectId: '', title: '', durationMinutes: '45', totalScore: '10' })
   const queryClient = useQueryClient()
 
   const { data: subjects } = useQuery({ queryKey: ['admin', 'subjects'], queryFn: listSubjects })
-  const { data, isLoading } = useQuery({ queryKey: ['teacher', 'exams'], queryFn: listExams })
+  const { data, isLoading } = useQuery({
+    queryKey: ['teacher', 'exams', page],
+    queryFn: () => listExams({ page }),
+  })
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -56,6 +67,15 @@ export default function ExamsPage() {
       navigate(`/teacher/exams/${exam.id}`)
     },
     onError: () => toast.error('Không thể tạo đề thi'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteExam(id),
+    onSuccess: () => {
+      toast.success('Đã xóa đề thi')
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'exams'] })
+    },
+    onError: (error) => toast.error(getErrorMessage(error, DELETE_EXAM_ERROR, 'Không thể xóa đề thi')),
   })
 
   return (
@@ -155,16 +175,34 @@ export default function ExamsPage() {
                 <Badge variant={STATUS_VARIANT[exam.status]}>{STATUS_LABEL[exam.status]}</Badge>
               </TableCell>
               <TableCell>
-                {exam.status === 'published' && (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/teacher/exams/${exam.id}/results`}>Kết quả</Link>
-                  </Button>
-                )}
+                <div className="flex items-center justify-end gap-2">
+                  {exam.status === 'published' && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/teacher/exams/${exam.id}/results`}>Kết quả</Link>
+                    </Button>
+                  )}
+                  <ConfirmDeleteButton
+                    title={`Xóa đề thi "${exam.title}"?`}
+                    description="Toàn bộ câu hỏi và phòng thi gắn với đề này sẽ bị xóa theo. Hành động này không thể hoàn tác."
+                    pending={deleteMutation.isPending}
+                    onConfirm={() => deleteMutation.mutate(exam.id)}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {data && (
+        <PaginationControls
+          currentPage={data.metadata.currentPage}
+          lastPage={data.metadata.lastPage}
+          total={data.metadata.total}
+          perPage={data.metadata.perPage}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }

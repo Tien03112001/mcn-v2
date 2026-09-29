@@ -13,7 +13,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { createSubject, listSubjects } from '@/lib/api/admin'
+import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
+import { createSubject, deleteSubject, listSubjects } from '@/lib/api/admin'
+import { getErrorMessage } from '@/lib/api-error'
+
+const DELETE_SUBJECT_ERROR: Record<string, string> = {
+  SUBJECT_IN_USE: 'Không thể xóa: môn học này đang được dùng trong câu hỏi hoặc đề thi.',
+}
 
 export default function SubjectsPage() {
   const [open, setOpen] = useState(false)
@@ -34,6 +40,15 @@ export default function SubjectsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] })
     },
     onError: () => toast.error('Không thể tạo môn học (mã môn có thể đã tồn tại)'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteSubject(id),
+    onSuccess: () => {
+      toast.success('Đã xóa môn học')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] })
+    },
+    onError: (error) => toast.error(getErrorMessage(error, DELETE_SUBJECT_ERROR, 'Không thể xóa môn học')),
   })
 
   return (
@@ -78,12 +93,13 @@ export default function SubjectsPage() {
           <TableRow>
             <TableHead>Mã môn</TableHead>
             <TableHead>Tên môn</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground">
+              <TableCell colSpan={3} className="text-center text-muted-foreground">
                 Đang tải...
               </TableCell>
             </TableRow>
@@ -92,6 +108,14 @@ export default function SubjectsPage() {
             <TableRow key={subject.id}>
               <TableCell>{subject.code}</TableCell>
               <TableCell>{subject.name}</TableCell>
+              <TableCell>
+                <ConfirmDeleteButton
+                  title={`Xóa môn học "${subject.name}"?`}
+                  description="Hành động này không thể hoàn tác."
+                  pending={deleteMutation.isPending}
+                  onConfirm={() => deleteMutation.mutate(subject.id)}
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

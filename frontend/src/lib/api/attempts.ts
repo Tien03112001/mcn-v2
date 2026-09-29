@@ -1,4 +1,5 @@
 import apiClient from '@/lib/api-client'
+import type { PaginatedResponse } from '@/lib/api/admin'
 import type {
   AnswerPayload,
   AttemptDetail,
@@ -53,7 +54,7 @@ export async function getAttemptResult(attemptId: number) {
   return data.data
 }
 
-export async function listAttemptHistory() {
-  const { data } = await apiClient.get<{ data: AttemptHistoryItem[] }>('/student/attempts')
-  return data.data
+export async function listAttemptHistory(params?: { page?: number; perPage?: number }) {
+  const { data } = await apiClient.get<PaginatedResponse<AttemptHistoryItem>>('/student/attempts', { params })
+  return data
 }

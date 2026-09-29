@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { PaginationControls } from '@/components/common/PaginationControls'
 import { getExam, listExamAttempts } from '@/lib/api/exams'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -14,12 +16,14 @@ const STATUS_LABEL: Record<string, string> = {
 export default function ExamResultsPage() {
   const { id } = useParams<{ id: string }>()
   const examId = Number(id)
+  const [page, setPage] = useState(1)
 
   const { data: exam } = useQuery({ queryKey: ['teacher', 'exams', examId], queryFn: () => getExam(examId) })
-  const { data: attempts, isLoading } = useQuery({
-    queryKey: ['teacher', 'exams', examId, 'attempts'],
-    queryFn: () => listExamAttempts(examId),
+  const { data, isLoading } = useQuery({
+    queryKey: ['teacher', 'exams', examId, 'attempts', page],
+    queryFn: () => listExamAttempts(examId, { page }),
   })
+  const attempts = data?.data
 
   return (
     <div>
@@ -66,6 +70,16 @@ export default function ExamResultsPage() {
           ))}
         </TableBody>
       </Table>
+
+      {data && (
+        <PaginationControls
+          currentPage={data.metadata.currentPage}
+          lastPage={data.metadata.lastPage}
+          total={data.metadata.total}
+          perPage={data.metadata.perPage}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }

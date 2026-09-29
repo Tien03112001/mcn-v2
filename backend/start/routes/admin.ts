@@ -13,7 +13,6 @@ router
       .group(() => {
         router.get('dashboard', [DashboardController, 'index'])
 
-        router.get('users', [UsersController, 'index'])
         router.post('users', [UsersController, 'store'])
         router.get('users/:id', [UsersController, 'show'])
         router.patch('users/:id', [UsersController, 'update'])
@@ -34,10 +33,12 @@ router
       .as('admin')
       .use([middleware.auth(), middleware.rbac(['admin'])])
 
-    // Read-only reference data (subjects, topics, tags) is also needed by
-    // teachers when authoring questions/exams — writes stay admin-only above.
+    // Read-only reference data (subjects, topics, tags, student lookup) is
+    // also needed by teachers when authoring questions/exams and building
+    // exam room rosters — writes stay admin-only above.
     router
       .group(() => {
+        router.get('users', [UsersController, 'index'])
         router.get('subjects', [SubjectsController, 'index'])
         router.get('subjects/:id', [SubjectsController, 'show'])
         router.get('subjects/:subjectId/topics', [TopicsController, 'index'])

@@ -138,14 +138,18 @@ export default class AttemptsController {
     }
   }
 
-  async history({ authUser }: HttpContext) {
+  async history({ request, authUser }: HttpContext) {
+    const page = request.input('page', 1)
+    const perPage = request.input('perPage', 20)
+
     const attempts = await ExamAttempt.query()
       .where('student_id', authUser.id)
       .preload('examRoom', (q) => q.preload('exam'))
       .orderBy('created_at', 'desc')
+      .paginate(page, perPage)
 
     return {
-      data: attempts.map((a) => ({
+      data: attempts.all().map((a) => ({
         attemptId: a.id,
         examTitle: a.examRoom.exam.title,
         status: a.status,
@@ -154,6 +158,7 @@ export default class AttemptsController {
         submittedAt: a.submittedAt,
         isFlagged: a.isFlagged,
       })),
+      metadata: attempts.getMeta(),
     }
   }
 

@@ -3,8 +3,47 @@ import type { PaginatedResponse } from '@/lib/api/admin'
 import type { Exam, ExamRoomAssignment, ExamQuestionSummary } from '@/types/exam'
 import type { User } from '@/types/user'
 
-export async function listExams() {
-  const { data } = await apiClient.get<PaginatedResponse<Exam>>('/teacher/exams')
+export interface TeacherDashboardStats {
+  questions: { total: number; easy: number; medium: number; hard: number }
+  exams: { total: number; draft: number; published: number; archived: number }
+  examRooms: { total: number }
+  attempts: {
+    total: number
+    inProgress: number
+    submitted: number
+    autoSubmitted: number
+    expired: number
+    last7Days: number
+    averageScore: number | null
+    flagged: number
+  }
+  trend: { date: string; total: number }[]
+  upcomingExamRooms: {
+    id: number
+    examId: number
+    examTitle: string
+    roomName: string
+    opensAt: string
+    closesAt: string
+  }[]
+  recentAttempts: {
+    id: number
+    studentName: string
+    examTitle: string
+    roomName: string
+    status: string
+    score: number | null
+    submittedAt: string | null
+  }[]
+}
+
+export async function getTeacherDashboardStats() {
+  const { data } = await apiClient.get<{ data: TeacherDashboardStats }>('/teacher/dashboard')
+  return data.data
+}
+
+export async function listExams(params?: { page?: number; perPage?: number }) {
+  const { data } = await apiClient.get<PaginatedResponse<Exam>>('/teacher/exams', { params })
   return data
 }
 
@@ -34,6 +73,10 @@ export async function updateExam(id: number, payload: Partial<{ title: string; d
 export async function publishExam(id: number) {
   const { data } = await apiClient.post<{ data: Exam }>(`/teacher/exams/${id}/publish`)
   return data.data
+}
+
+export async function deleteExam(id: number) {
+  await apiClient.delete(`/teacher/exams/${id}`)
 }
 
 export async function listExamQuestions(examId: number) {
@@ -76,9 +119,16 @@ export async function deleteExamRoom(examId: number, roomId: number) {
   await apiClient.delete(`/teacher/exams/${examId}/rooms/${roomId}`)
 }
 
-export async function listExamRoomStudents(examId: number, roomId: number) {
-  const { data } = await apiClient.get<{ data: User[] }>(`/teacher/exams/${examId}/rooms/${roomId}/students`)
-  return data.data
+export async function listExamRoomStudents(
+  examId: number,
+  roomId: number,
+  params?: { page?: number; perPage?: number }
+) {
+  const { data } = await apiClient.get<PaginatedResponse<User>>(
+    `/teacher/exams/${examId}/rooms/${roomId}/students`,
+    { params }
+  )
+  return data
 }
 
 export async function addExamRoomStudent(examId: number, roomId: number, studentId: number) {
@@ -116,9 +166,12 @@ export interface ExamAttemptSummary {
   submittedAt: string | null
 }
 
-export async function listExamAttempts(examId: number) {
-  const { data } = await apiClient.get<{ data: ExamAttemptSummary[] }>(`/teacher/exams/${examId}/attempts`)
-  return data.data
+export async function listExamAttempts(examId: number, params?: { page?: number; perPage?: number }) {
+  const { data } = await apiClient.get<PaginatedResponse<ExamAttemptSummary>>(
+    `/teacher/exams/${examId}/attempts`,
+    { params }
+  )
+  return data
 }
 
 export interface AttemptDetailForTeacher {

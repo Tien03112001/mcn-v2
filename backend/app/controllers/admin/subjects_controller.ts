@@ -41,7 +41,13 @@ export default class SubjectsController {
     if (!subject) {
       return response.notFound({ error: { code: 'SUBJECT_NOT_FOUND' } })
     }
-    await subject.delete()
+
+    try {
+      await subject.delete()
+    } catch {
+      return response.conflict({ error: { code: 'SUBJECT_IN_USE' } })
+    }
+
     return response.noContent()
   }
 }
