@@ -1,11 +1,12 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { LogOut } from 'lucide-react'
+import { LogOut, UserCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { logout as logoutRequest } from '@/lib/api/auth'
@@ -72,6 +73,13 @@ export default function AppLayout({ navItems, title }: AppLayoutProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/profile">
+                    <UserCircle className="mr-2 size-4" />
+                    Thông tin tài khoản
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
                   <LogOut className="mr-2 size-4" />
                   Đăng xuất

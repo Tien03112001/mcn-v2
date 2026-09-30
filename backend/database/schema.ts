@@ -8,10 +8,8 @@ import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
 export class DocumentSchema extends BaseModel {
-  static $columns = ['category', 'createdAt', 'description', 'fileName', 'id', 'mimeType', 'sizeBytes', 'storedPath', 'title', 'uploadedBy'] as const
+  static $columns = ['createdAt', 'description', 'fileName', 'id', 'mimeType', 'sizeBytes', 'storedPath', 'subjectId', 'title', 'uploadedBy'] as const
   $columns = DocumentSchema.$columns
-  @column()
-  declare category: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
@@ -26,6 +24,8 @@ export class DocumentSchema extends BaseModel {
   declare sizeBytes: bigint | number | null
   @column()
   declare storedPath: string
+  @column()
+  declare subjectId: number | null
   @column()
   declare title: string
   @column()

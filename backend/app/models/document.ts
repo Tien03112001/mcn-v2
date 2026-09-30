@@ -2,6 +2,7 @@ import { DocumentSchema } from '#database/schema'
 import { belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
+import Subject from '#models/subject'
 
 export default class Document extends DocumentSchema {
   /**
@@ -17,4 +18,7 @@ export default class Document extends DocumentSchema {
 
   @belongsTo(() => User, { foreignKey: 'uploadedBy' })
   declare uploader: BelongsTo<typeof User>
+
+  @belongsTo(() => Subject)
+  declare subject: BelongsTo<typeof Subject>
 }

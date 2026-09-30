@@ -35,3 +35,8 @@ export const updateUserValidator = vine.create({
 export const resetPasswordValidator = vine.create({
   password: password(),
 })
+
+export const changePasswordValidator = vine.create({
+  currentPassword: vine.string(),
+  newPassword: password(),
+})

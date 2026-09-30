@@ -10,5 +10,6 @@ router
     router.post('refresh', [AuthController, 'refresh'])
     router.post('logout', [AuthController, 'logout']).use(middleware.auth())
     router.get('me', [AuthController, 'me']).use(middleware.auth())
+    router.post('change-password', [AuthController, 'changePassword']).use(middleware.auth())
   })
   .prefix('/api/v1/auth')

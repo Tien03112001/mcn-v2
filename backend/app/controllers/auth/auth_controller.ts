@@ -4,7 +4,7 @@ import env from '#start/env'
 import User from '#models/user'
 import AuthService from '#services/auth_service'
 import UserTransformer from '#transformers/user_transformer'
-import { loginValidator } from '#validators/user'
+import { loginValidator, changePasswordValidator } from '#validators/user'
 
 const REFRESH_COOKIE_NAME = 'refresh_token'
 
@@ -58,6 +58,20 @@ export default class AuthController {
 
   async me({ authUser, serialize }: HttpContext) {
     return serialize(UserTransformer.transform(authUser))
+  }
+
+  async changePassword({ request, authUser, response }: HttpContext) {
+    const { currentPassword, newPassword } = await request.validateUsing(changePasswordValidator)
+
+    const isValid = await hash.verify(authUser.password, currentPassword)
+    if (!isValid) {
+      return response.unauthorized({ error: { code: 'INVALID_CURRENT_PASSWORD' } })
+    }
+
+    authUser.password = newPassword
+    await authUser.save()
+
+    return { message: 'Password changed successfully' }
   }
 
   #setRefreshCookie(response: HttpContext['response'], token: string) {

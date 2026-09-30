@@ -16,6 +16,8 @@ export interface Subject {
   code: string
   name: string
   description: string | null
+  createdAt: string
+  updatedAt: string | null
 }
 
 export interface Topic {
@@ -96,7 +98,10 @@ export async function createUser(payload: {
   return data.data
 }
 
-export async function updateUser(id: number, payload: Partial<{ fullName: string; email: string; isActive: boolean }>) {
+export async function updateUser(
+  id: number,
+  payload: Partial<{ fullName: string; email: string; role: UserRole; studentCode: string; isActive: boolean }>
+) {
   const { data } = await apiClient.patch<{ data: User }>(`/admin/users/${id}`, payload)
   return data.data
 }
@@ -109,6 +114,29 @@ export async function resetUserPassword(id: number, password: string) {
   await apiClient.post(`/admin/users/${id}/reset-password`, { password })
 }
 
+export async function importUsers(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await apiClient.post<{ data: { created: number; skipped: string[] } }>(
+    '/admin/users/import',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
+  return data.data
+}
+
+export async function downloadUserTemplate() {
+  const response = await apiClient.get('/admin/users/template', { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data as Blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'mau_nhap_nguoi_dung.xlsx'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 // Subjects & topics
 export async function listSubjects() {
   const { data } = await apiClient.get<{ data: Subject[] }>('/admin/subjects')
@@ -117,6 +145,14 @@ export async function listSubjects() {
 
 export async function createSubject(payload: { code: string; name: string; description?: string }) {
   const { data } = await apiClient.post<{ data: Subject }>('/admin/subjects', payload)
+  return data.data
+}
+
+export async function updateSubject(
+  id: number,
+  payload: Partial<{ code: string; name: string; description: string }>
+) {
+  const { data } = await apiClient.patch<{ data: Subject }>(`/admin/subjects/${id}`, payload)
   return data.data
 }
 

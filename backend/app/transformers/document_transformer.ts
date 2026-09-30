@@ -8,7 +8,7 @@ export default class DocumentTransformer extends BaseTransformer<Document> {
         'id',
         'title',
         'description',
-        'category',
+        'subjectId',
         'fileName',
         'mimeType',
         'uploadedBy',
@@ -16,6 +16,7 @@ export default class DocumentTransformer extends BaseTransformer<Document> {
       ]),
       sizeBytes: this.resource.sizeBytesNumber,
       uploadedByName: this.resource.uploader?.fullName ?? null,
+      subjectName: this.resource.subject?.name ?? null,
     }
   }
 }

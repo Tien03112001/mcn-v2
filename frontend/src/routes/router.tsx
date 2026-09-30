@@ -4,6 +4,7 @@ import HomePage from '@/pages/landing/HomePage'
 import LoginPage from '@/pages/auth/LoginPage'
 import ForbiddenPage from '@/pages/ForbiddenPage'
 import DocumentsPage from '@/pages/DocumentsPage'
+import ProfilePage from '@/pages/ProfilePage'
 
 import StaffLayout from '@/components/layout/StaffLayout'
 import DashboardPage from '@/pages/admin/DashboardPage'
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/teacher', element: <TeacherDashboardPage /> },
           { path: '/documents', element: <DocumentsPage /> },
+          { path: '/profile', element: <ProfilePage /> },
           { path: '/teacher/questions', element: <QuestionBankPage /> },
           { path: '/teacher/questions/new', element: <QuestionEditorPage /> },
           { path: '/teacher/questions/:id', element: <QuestionEditorPage /> },
@@ -76,6 +78,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/student', element: <ExamListPage /> },
           { path: '/documents', element: <DocumentsPage /> },
+          { path: '/profile', element: <ProfilePage /> },
           { path: '/student/history', element: <AttemptHistoryPage /> },
           { path: '/student/attempts/:attemptId/result', element: <ExamResultPage /> },
         ],

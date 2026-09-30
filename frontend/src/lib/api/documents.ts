@@ -1,22 +1,35 @@
 import apiClient from '@/lib/api-client'
 import type { PaginatedResponse } from '@/lib/api/admin'
-import type { DocumentItem } from '@/types/document'
+import type { DocumentItem, DocumentUploader } from '@/types/document'
 
-export async function listDocuments(params?: { page?: number; perPage?: number; keyword?: string }) {
+export async function listDocuments(params?: {
+  page?: number
+  perPage?: number
+  keyword?: string
+  subjectId?: number
+  uploadedBy?: number
+  from?: string
+  to?: string
+}) {
   const { data } = await apiClient.get<PaginatedResponse<DocumentItem>>('/documents', { params })
   return data
+}
+
+export async function listDocumentUploaders() {
+  const { data } = await apiClient.get<{ data: DocumentUploader[] }>('/documents/uploaders')
+  return data.data
 }
 
 export async function uploadDocument(payload: {
   title: string
   description?: string
-  category?: string
+  subjectId?: number
   file: File
 }) {
   const formData = new FormData()
   formData.append('title', payload.title)
   if (payload.description) formData.append('description', payload.description)
-  if (payload.category) formData.append('category', payload.category)
+  if (payload.subjectId) formData.append('subjectId', String(payload.subjectId))
   formData.append('file', payload.file)
 
   const { data } = await apiClient.post<{ data: DocumentItem }>('/documents', formData, {

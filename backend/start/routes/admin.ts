@@ -14,6 +14,8 @@ router
         router.get('dashboard', [DashboardController, 'index'])
 
         router.post('users', [UsersController, 'store'])
+        router.get('users/template', [UsersController, 'template'])
+        router.post('users/import', [UsersController, 'import'])
         router.get('users/:id', [UsersController, 'show'])
         router.patch('users/:id', [UsersController, 'update'])
         router.delete('users/:id', [UsersController, 'destroy'])
@@ -33,18 +35,27 @@ router
       .as('admin')
       .use([middleware.auth(), middleware.rbac(['admin'])])
 
-    // Read-only reference data (subjects, topics, tags, student lookup) is
-    // also needed by teachers when authoring questions/exams and building
-    // exam room rosters — writes stay admin-only above.
+    // Student lookup is needed by teachers building exam room rosters —
+    // writes stay admin-only above, and this stays off-limits to students
+    // themselves (it's the full user directory, not just reference data).
     router
       .group(() => {
         router.get('users', [UsersController, 'index'])
+      })
+      .as('adminReadonly')
+      .use([middleware.auth(), middleware.rbac(['admin', 'teacher'])])
+
+    // Subjects/topics/tags are plain reference data (no sensitive info) —
+    // also needed by students, e.g. to filter the shared document library
+    // by subject. Writes stay admin-only above.
+    router
+      .group(() => {
         router.get('subjects', [SubjectsController, 'index'])
         router.get('subjects/:id', [SubjectsController, 'show'])
         router.get('subjects/:subjectId/topics', [TopicsController, 'index'])
         router.get('tags', [TagsController, 'index'])
       })
-      .as('adminReadonly')
-      .use([middleware.auth(), middleware.rbac(['admin', 'teacher'])])
+      .as('referenceReadonly')
+      .use([middleware.auth(), middleware.rbac(['admin', 'teacher', 'student'])])
   })
   .prefix('/api/v1/admin')

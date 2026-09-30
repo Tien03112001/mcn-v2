@@ -15,10 +15,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
+import { DatePicker } from '@/components/common/DatePicker'
 import { PaginationControls } from '@/components/common/PaginationControls'
-import { deleteDocument, downloadDocument, getDocumentPreviewUrl, listDocuments, uploadDocument } from '@/lib/api/documents'
+import { listSubjects } from '@/lib/api/admin'
+import {
+  deleteDocument,
+  downloadDocument,
+  getDocumentPreviewUrl,
+  listDocuments,
+  listDocumentUploaders,
+  uploadDocument,
+} from '@/lib/api/documents'
 import { getErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/auth-store'
 import type { DocumentItem } from '@/types/document'
@@ -50,18 +60,40 @@ export default function DocumentsPage() {
 
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
+  const [subjectFilter, setSubjectFilter] = useState('all')
+  const [uploaderFilter, setUploaderFilter] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', category: '' })
+  const [form, setForm] = useState({ title: '', description: '', subjectId: '' })
   const [file, setFile] = useState<File | null>(null)
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const queryClient = useQueryClient()
 
+  const { data: subjects } = useQuery({ queryKey: ['admin', 'subjects'], queryFn: listSubjects })
+  const { data: uploaders } = useQuery({ queryKey: ['documents', 'uploaders'], queryFn: listDocumentUploaders })
+
   const { data, isLoading } = useQuery({
-    queryKey: ['documents', page, keyword],
-    queryFn: () => listDocuments({ page, keyword: keyword || undefined }),
+    queryKey: ['documents', page, keyword, subjectFilter, uploaderFilter, fromDate, toDate],
+    queryFn: () =>
+      listDocuments({
+        page,
+        keyword: keyword || undefined,
+        subjectId: subjectFilter === 'all' ? undefined : Number(subjectFilter),
+        uploadedBy: uploaderFilter === 'all' ? undefined : Number(uploaderFilter),
+        from: fromDate || undefined,
+        to: toDate || undefined,
+      }),
   })
+
+  function resetToFirstPage<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v)
+      setPage(1)
+    }
+  }
 
   const uploadMutation = useMutation({
     mutationFn: () => {
@@ -69,14 +101,14 @@ export default function DocumentsPage() {
       return uploadDocument({
         title: form.title,
         description: form.description || undefined,
-        category: form.category || undefined,
+        subjectId: form.subjectId ? Number(form.subjectId) : undefined,
         file,
       })
     },
     onSuccess: () => {
       toast.success('Đã tải lên tài liệu')
       setOpen(false)
-      setForm({ title: '', description: '', category: '' })
+      setForm({ title: '', description: '', subjectId: '' })
       setFile(null)
       queryClient.invalidateQueries({ queryKey: ['documents'] })
     },
@@ -160,12 +192,23 @@ export default function DocumentsPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label>Danh mục (không bắt buộc)</Label>
-                  <Input
-                    placeholder="VD: Tin học, Toán, Biểu mẫu..."
-                    value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  />
+                  <Label>Môn học (không bắt buộc)</Label>
+                  <Select
+                    value={form.subjectId || 'none'}
+                    onValueChange={(v) => setForm((f) => ({ ...f, subjectId: v === 'none' ? '' : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn môn học" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Không chọn môn học</SelectItem>
+                      {subjects?.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Tệp tin</Label>
@@ -187,21 +230,70 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      <Input
-        placeholder="Tìm theo tiêu đề..."
-        value={keyword}
-        onChange={(e) => {
-          setKeyword(e.target.value)
-          setPage(1)
-        }}
-        className="mb-4 max-w-xs"
-      />
+      <div className="mb-4 flex flex-wrap items-end gap-2">
+        <Input
+          placeholder="Tìm theo tiêu đề..."
+          value={keyword}
+          onChange={(e) => resetToFirstPage(setKeyword)(e.target.value)}
+          className="max-w-xs"
+        />
+        <Select value={subjectFilter} onValueChange={resetToFirstPage(setSubjectFilter)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Môn học" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả môn học</SelectItem>
+            {subjects?.map((s) => (
+              <SelectItem key={s.id} value={String(s.id)}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={uploaderFilter} onValueChange={resetToFirstPage(setUploaderFilter)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Người tải lên" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả người tải lên</SelectItem>
+            {uploaders?.map((u) => (
+              <SelectItem key={u.id} value={String(u.id)}>
+                {u.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Từ ngày</Label>
+          <DatePicker value={fromDate} onChange={resetToFirstPage(setFromDate)} placeholder="Từ ngày" className="w-36" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Đến ngày</Label>
+          <DatePicker value={toDate} onChange={resetToFirstPage(setToDate)} placeholder="Đến ngày" className="w-36" />
+        </div>
+        {(subjectFilter !== 'all' || uploaderFilter !== 'all' || fromDate || toDate || keyword) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setKeyword('')
+              setSubjectFilter('all')
+              setUploaderFilter('all')
+              setFromDate('')
+              setToDate('')
+              setPage(1)
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        )}
+      </div>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Tiêu đề</TableHead>
-            <TableHead>Danh mục</TableHead>
+            <TableHead>Môn học</TableHead>
             <TableHead>Người tải lên</TableHead>
             <TableHead>Kích thước</TableHead>
             <TableHead>Ngày tải lên</TableHead>
@@ -234,7 +326,7 @@ export default function DocumentsPage() {
                   </div>
                 </div>
               </TableCell>
-              <TableCell>{doc.category ? <Badge variant="secondary">{doc.category}</Badge> : '—'}</TableCell>
+              <TableCell>{doc.subjectName ? <Badge variant="secondary">{doc.subjectName}</Badge> : '—'}</TableCell>
               <TableCell className="text-muted-foreground">{doc.uploadedByName ?? '—'}</TableCell>
               <TableCell className="text-muted-foreground">{formatFileSize(doc.sizeBytes)}</TableCell>
               <TableCell className="text-muted-foreground">

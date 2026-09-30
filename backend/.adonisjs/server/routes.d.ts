@@ -6,6 +6,8 @@ export type ScannedRoutes = {
   ALL: {
     'admin.dashboard.index': { paramsTuple?: []; params?: {} }
     'admin.users.store': { paramsTuple?: []; params?: {} }
+    'admin.users.template': { paramsTuple?: []; params?: {} }
+    'admin.users.import': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.users.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.users.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -20,10 +22,10 @@ export type ScannedRoutes = {
     'admin.tags.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.tags.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.users.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
-    'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'referenceReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
+    'referenceReadonly.tags.index': { paramsTuple?: []; params?: {} }
     'teacher.dashboard.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.store': { paramsTuple?: []; params?: {} }
@@ -55,6 +57,7 @@ export type ScannedRoutes = {
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'documents.index': { paramsTuple?: []; params?: {} }
+    'documents.uploaders': { paramsTuple?: []; params?: {} }
     'documents.download': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'documents.store': { paramsTuple?: []; params?: {} }
     'documents.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -62,6 +65,7 @@ export type ScannedRoutes = {
     'auth.refresh': { paramsTuple?: []; params?: {} }
     'auth.logout': { paramsTuple?: []; params?: {} }
     'auth.me': { paramsTuple?: []; params?: {} }
+    'auth.change_password': { paramsTuple?: []; params?: {} }
     'student.exams.index': { paramsTuple?: []; params?: {} }
     'student.exams.show': { paramsTuple: [ParamValue]; params: {'examRoomId': ParamValue} }
     'student.attempts.start': { paramsTuple: [ParamValue]; params: {'examRoomId': ParamValue} }
@@ -74,12 +78,13 @@ export type ScannedRoutes = {
   }
   GET: {
     'admin.dashboard.index': { paramsTuple?: []; params?: {} }
+    'admin.users.template': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.users.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
-    'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'referenceReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
+    'referenceReadonly.tags.index': { paramsTuple?: []; params?: {} }
     'teacher.dashboard.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -93,6 +98,7 @@ export type ScannedRoutes = {
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'documents.index': { paramsTuple?: []; params?: {} }
+    'documents.uploaders': { paramsTuple?: []; params?: {} }
     'documents.download': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'auth.me': { paramsTuple?: []; params?: {} }
     'student.exams.index': { paramsTuple?: []; params?: {} }
@@ -103,12 +109,13 @@ export type ScannedRoutes = {
   }
   HEAD: {
     'admin.dashboard.index': { paramsTuple?: []; params?: {} }
+    'admin.users.template': { paramsTuple?: []; params?: {} }
     'admin.users.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'adminReadonly.users.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.index': { paramsTuple?: []; params?: {} }
-    'adminReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'adminReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
-    'adminReadonly.tags.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.index': { paramsTuple?: []; params?: {} }
+    'referenceReadonly.subjects.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'referenceReadonly.topics.index': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
+    'referenceReadonly.tags.index': { paramsTuple?: []; params?: {} }
     'teacher.dashboard.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.index': { paramsTuple?: []; params?: {} }
     'teacher.questions.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -122,6 +129,7 @@ export type ScannedRoutes = {
     'teacher.attempts.violations': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'files.files.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'documents.index': { paramsTuple?: []; params?: {} }
+    'documents.uploaders': { paramsTuple?: []; params?: {} }
     'documents.download': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'auth.me': { paramsTuple?: []; params?: {} }
     'student.exams.index': { paramsTuple?: []; params?: {} }
@@ -132,6 +140,7 @@ export type ScannedRoutes = {
   }
   POST: {
     'admin.users.store': { paramsTuple?: []; params?: {} }
+    'admin.users.import': { paramsTuple?: []; params?: {} }
     'admin.users.reset_password': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.subjects.store': { paramsTuple?: []; params?: {} }
     'admin.topics.store': { paramsTuple: [ParamValue]; params: {'subjectId': ParamValue} }
@@ -148,6 +157,7 @@ export type ScannedRoutes = {
     'auth.login': { paramsTuple?: []; params?: {} }
     'auth.refresh': { paramsTuple?: []; params?: {} }
     'auth.logout': { paramsTuple?: []; params?: {} }
+    'auth.change_password': { paramsTuple?: []; params?: {} }
     'student.attempts.start': { paramsTuple: [ParamValue]; params: {'examRoomId': ParamValue} }
     'student.attempts.report_violation': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }
     'student.attempts.submit': { paramsTuple: [ParamValue]; params: {'attemptId': ParamValue} }

@@ -6,6 +6,7 @@ const DocumentsController = () => import('#controllers/shared/documents_controll
 router
   .group(() => {
     router.get('documents', [DocumentsController, 'index'])
+    router.get('documents/uploaders', [DocumentsController, 'uploaders'])
     router.get('documents/:id/download', [DocumentsController, 'download'])
   })
   .prefix('/api/v1')
