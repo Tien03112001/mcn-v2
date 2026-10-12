@@ -1,0 +1,417 @@
+<title>Use Case Thi Online</title>
+<style>
+/*
+  Layout: 3 actors in a left rail, a bordered "system boundary" box on the
+  right holding 7 feature groups in a 2-col grid; an SVG overlay (computed
+  from actual DOM rects at runtime) draws actor-group associations and
+  include/extend arcs between use cases, so geometry never drifts from CSS.
+*/
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#f8f9fb;
+  --ink:#1c232d; --ink-dim:#5c6572; --line:#d3d8e0;
+  --accent:#3a6ea8; --accent-ink:#1f4d78;
+  --role-admin-bg:#fbf1dd; --role-admin-border:#d8b467; --role-admin-text:#6b4e14;
+  --role-teacher-bg:#e3f3ec; --role-teacher-border:#79b89a; --role-teacher-text:#1f5c40;
+  --role-student-bg:#eae8fb; --role-student-border:#9c94e0; --role-student-text:#3f3597;
+  --role-shared-bg:#eef1f5; --role-shared-border:#aeb8c4; --role-shared-text:#39434f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161c; --surface:#1a1f27; --surface-2:#161b22;
+    --ink:#e8ebef; --ink-dim:#95a0ad; --line:#2b323c;
+    --accent:#7fb0dd; --accent-ink:#bcd9f2;
+    --role-admin-bg:#2e2814; --role-admin-border:#8a6a2a; --role-admin-text:#e3c788;
+    --role-teacher-bg:#16281f; --role-teacher-border:#3f7a5c; --role-teacher-text:#9adfc0;
+    --role-student-bg:#211e3a; --role-student-border:#5c51b0; --role-student-text:#c7c0f5;
+    --role-shared-bg:#1d222b; --role-shared-border:#3b4552; --role-shared-text:#b7c0cc;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161c; --surface:#1a1f27; --surface-2:#161b22;
+  --ink:#e8ebef; --ink-dim:#95a0ad; --line:#2b323c;
+  --accent:#7fb0dd; --accent-ink:#bcd9f2;
+  --role-admin-bg:#2e2814; --role-admin-border:#8a6a2a; --role-admin-text:#e3c788;
+  --role-teacher-bg:#16281f; --role-teacher-border:#3f7a5c; --role-teacher-text:#9adfc0;
+  --role-student-bg:#211e3a; --role-student-border:#5c51b0; --role-student-text:#c7c0f5;
+  --role-shared-bg:#1d222b; --role-shared-border:#3b4552; --role-shared-text:#b7c0cc;
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif;
+  padding-inline:16px; padding-block:28px 48px;
+  display:flex; justify-content:center;
+}
+.page{ width:100%; max-width:1180px; display:flex; flex-direction:column; gap:28px; }
+
+h1{
+  font-family:'Sora',system-ui,sans-serif; font-weight:700;
+  font-size:clamp(22px,4vw,30px); margin:0; letter-spacing:-0.01em; text-wrap:balance;
+}
+.subtitle{ margin:6px 0 0; color:var(--ink-dim); font-size:14.5px; max-width:70ch; }
+
+/* ---- analysis cards ---- */
+.actor-summary{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+.actor-summary .card{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; display:flex; flex-direction:column; gap:8px;
+}
+.actor-summary .card .icon-row{ display:flex; align-items:center; gap:10px; }
+.actor-summary .card h3{ margin:0; font-family:'Sora',sans-serif; font-size:15.5px; font-weight:700; }
+.actor-summary .card p{ margin:0; color:var(--ink-dim); font-size:13.5px; line-height:1.5; }
+.role-dot{ width:11px; height:11px; border-radius:50%; flex:none; }
+.role-dot.admin{ background:var(--role-admin-border); }
+.role-dot.teacher{ background:var(--role-teacher-border); }
+.role-dot.student{ background:var(--role-student-border); }
+
+/* ---- legend ---- */
+.legend{
+  display:flex; flex-wrap:wrap; gap:18px; align-items:center;
+  font-size:12.5px; color:var(--ink-dim);
+  border:1px solid var(--line); background:var(--surface); border-radius:10px;
+  padding:10px 16px;
+}
+.legend .item{ display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.legend svg{ flex:none; }
+.swatch{ width:13px; height:13px; border-radius:4px; border:1px solid var(--line); }
+.swatch.admin{ background:var(--role-admin-bg); border-color:var(--role-admin-border); }
+.swatch.teacher{ background:var(--role-teacher-bg); border-color:var(--role-teacher-border); }
+.swatch.student{ background:var(--role-student-bg); border-color:var(--role-student-border); }
+.swatch.shared{ background:var(--role-shared-bg); border-color:var(--role-shared-border); }
+
+/* ---- diagram scroller ---- */
+.diagram-scroll{
+  overflow-x:auto; border-radius:14px; background:var(--surface-2);
+  border:1px solid var(--line); padding:28px 20px;
+}
+.board{
+  position:relative; display:flex; gap:36px; min-width:960px; width:max-content;
+}
+.actors{
+  width:152px; flex:none; display:flex; flex-direction:column; justify-content:space-between;
+  padding-block:18px;
+}
+.actor-card{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; }
+.actor-card svg{ color:var(--ink); }
+.actor-card .name{ font-family:'Sora',sans-serif; font-weight:700; font-size:13.5px; }
+.actor-card .role-tag{
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.03em;
+  color:var(--ink-dim); text-transform:uppercase;
+}
+
+.boundary{
+  position:relative; flex:1; border:2px solid var(--accent); border-radius:16px;
+  background:var(--surface); padding:38px 22px 22px;
+}
+.boundary::before{
+  content:"Hệ thống Ngân hàng đề thi & Thi online";
+  position:absolute; top:-13px; left:20px; background:var(--surface);
+  padding:0 10px; font-family:'Sora',sans-serif; font-weight:700; font-size:13px;
+  color:var(--accent-ink); letter-spacing:.01em;
+}
+.grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+.span2{ grid-column:1 / -1; }
+
+.group{ border-radius:12px; border:1.5px dashed var(--line); padding:14px 16px 16px; position:relative; }
+.group-label{
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ink-dim);
+  letter-spacing:.04em; margin-bottom:2px; display:block;
+}
+.group h4{
+  margin:0 0 12px; font-family:'Sora',sans-serif; font-size:14px; font-weight:700; color:var(--ink);
+}
+.ucs-list{ display:flex; flex-direction:column; gap:12px; padding-right:96px; position:relative; }
+.uc{
+  border-radius:999px; padding:9px 16px; font-size:12.8px; font-weight:500;
+  border:1.5px solid; text-align:center; line-height:1.3; position:relative; z-index:2;
+}
+.group.admin{ background:var(--role-admin-bg); border-color:var(--role-admin-border); }
+.group.admin .uc{ background:var(--surface); border-color:var(--role-admin-border); color:var(--role-admin-text); }
+.group.teacher{ background:var(--role-teacher-bg); border-color:var(--role-teacher-border); }
+.group.teacher .uc{ background:var(--surface); border-color:var(--role-teacher-border); color:var(--role-teacher-text); }
+.group.student{ background:var(--role-student-bg); border-color:var(--role-student-border); }
+.group.student .uc{ background:var(--surface); border-color:var(--role-student-border); color:var(--role-student-text); }
+.group.shared{ background:var(--role-shared-bg); border-color:var(--role-shared-border); }
+.group.shared .uc{ background:var(--surface); border-color:var(--role-shared-border); color:var(--role-shared-text); }
+
+#connectors{ position:absolute; inset:0; pointer-events:none; overflow:visible; z-index:1; }
+.assoc-line{ fill:none; stroke:var(--accent); stroke-width:1.6; opacity:.55; }
+.rel-line{ fill:none; stroke:var(--ink-dim); stroke-width:1.4; stroke-dasharray:4 3; opacity:.8; }
+.rel-label-bg{ fill:var(--surface-2); stroke:var(--line); stroke-width:1; }
+.rel-label-text{ font-family:'JetBrains Mono',monospace; font-size:9.5px; fill:var(--ink-dim); }
+.arrowhead{ fill:var(--ink-dim); }
+
+/* ---- notes ---- */
+.notes{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:18px 20px;
+}
+.notes h3{ margin:0 0 10px; font-family:'Sora',sans-serif; font-size:15px; }
+.notes ul{ margin:0; padding-left:20px; color:var(--ink-dim); font-size:13.5px; line-height:1.65; }
+.notes li::marker{ color:var(--accent); }
+.notes code{
+  font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:var(--ink);
+}
+
+.hint{ font-size:12px; color:var(--ink-dim); text-align:right; margin-top:-6px; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+<div class="page">
+  <header>
+    <h1>Sơ đồ Use Case — Hệ thống Thi Online</h1>
+    <p class="subtitle">Phân tích theo 3 vai trò chính (Admin, Giáo viên, Sinh viên) và 7 nhóm chức năng, dựa trên luồng nghiệp vụ hiện có của hệ thống: quản trị người dùng, ngân hàng câu hỏi, đề thi, phòng thi và tài liệu dùng chung.</p>
+  </header>
+
+  <section class="actor-summary">
+    <div class="card">
+      <div class="icon-row"><span class="role-dot admin"></span><h3>Quản trị viên (Admin)</h3></div>
+      <p>Vận hành toàn hệ thống: tạo/sửa tài khoản người dùng (kể cả nhập hàng loạt qua Excel), quản lý môn học – chủ đề – thẻ gắn nhãn, quản lý tài liệu dùng chung và theo dõi thống kê tổng quan.</p>
+    </div>
+    <div class="card">
+      <div class="icon-row"><span class="role-dot teacher"></span><h3>Giáo viên</h3></div>
+      <p>Biên soạn ngân hàng câu hỏi, tạo và xuất bản đề thi do mình phụ trách, mở phòng thi gắn với từng đề, quản lý danh sách thí sinh của phòng, rồi theo dõi kết quả và vi phạm giám sát.</p>
+    </div>
+    <div class="card">
+      <div class="icon-row"><span class="role-dot student"></span><h3>Sinh viên</h3></div>
+      <p>Xem các đề thi được giao qua phòng thi mình có tên, làm bài trong thời gian cho phép (tự động nộp khi hết giờ hoặc vi phạm), và xem lại kết quả/lịch sử làm bài của bản thân.</p>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span class="item">
+      <svg width="34" height="10"><line x1="1" y1="5" x2="33" y2="5" stroke="var(--accent)" stroke-width="2" opacity=".7"/></svg>
+      Liên kết (association) — actor thực hiện nhóm chức năng
+    </span>
+    <span class="item">
+      <svg width="34" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="var(--ink-dim)" stroke-width="1.6" stroke-dasharray="4 3"/><path d="M27,5 L33,5" stroke="var(--ink-dim)" stroke-width="1.6"/><path d="M27,2 L33,5 L27,8 z" fill="var(--ink-dim)"/></svg>
+      «include» / «extend» giữa hai use case
+    </span>
+    <span class="item"><span class="swatch admin"></span>Admin</span>
+    <span class="item"><span class="swatch teacher"></span>Giáo viên</span>
+    <span class="item"><span class="swatch student"></span>Sinh viên</span>
+    <span class="item"><span class="swatch shared"></span>Dùng chung</span>
+  </div>
+
+  <div class="diagram-scroll">
+    <div class="board" id="board">
+      <div class="actors">
+        <div class="actor-card" data-actor="admin">
+          <svg width="40" height="56" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+            <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+            <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+          </svg>
+          <span class="name">Quản trị viên</span>
+          <span class="role-tag">Admin</span>
+        </div>
+        <div class="actor-card" data-actor="teacher">
+          <svg width="40" height="56" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+            <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+            <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+          </svg>
+          <span class="name">Giáo viên</span>
+          <span class="role-tag">Teacher</span>
+        </div>
+        <div class="actor-card" data-actor="student">
+          <svg width="40" height="56" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+            <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+            <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+          </svg>
+          <span class="name">Sinh viên</span>
+          <span class="role-tag">Student</span>
+        </div>
+      </div>
+
+      <div class="boundary">
+        <svg id="connectors">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path class="arrowhead" d="M0,0 L10,5 L0,10 z"/>
+            </marker>
+          </defs>
+        </svg>
+        <div class="grid" id="grid">
+          <div class="group shared span2" data-group="A">
+            <span class="group-label">A</span><h4>Dùng chung</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="login">Đăng nhập</div>
+              <div class="uc" data-uc="logout">Đăng xuất</div>
+              <div class="uc" data-uc="changepw">Đổi mật khẩu</div>
+              <div class="uc" data-uc="profile">Xem thông tin tài khoản</div>
+              <div class="uc" data-uc="viewdoc">Xem &amp; tải tài liệu dùng chung</div>
+            </div>
+          </div>
+
+          <div class="group admin" data-group="B">
+            <span class="group-label">B</span><h4>Quản trị người dùng</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="users">Quản lý người dùng</div>
+              <div class="uc" data-uc="usersImport">Nhập người dùng từ Excel</div>
+              <div class="uc" data-uc="usersTemplate">Tải file mẫu Excel</div>
+            </div>
+          </div>
+
+          <div class="group admin" data-group="C">
+            <span class="group-label">C</span><h4>Danh mục &amp; thống kê</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="subjects">Quản lý môn học &amp; chủ đề</div>
+              <div class="uc" data-uc="tags">Quản lý thẻ gắn nhãn</div>
+              <div class="uc" data-uc="stats">Xem thống kê tổng quan</div>
+            </div>
+          </div>
+
+          <div class="group shared span2" data-group="D">
+            <span class="group-label">D</span><h4>Quản lý tài liệu <span style="font-weight:400;color:var(--ink-dim);font-size:12px;">(Admin &amp; Giáo viên)</span></h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="docUpload">Tải lên tài liệu</div>
+              <div class="uc" data-uc="docDelete">Xoá tài liệu</div>
+            </div>
+          </div>
+
+          <div class="group teacher" data-group="E">
+            <span class="group-label">E</span><h4>Ngân hàng câu hỏi &amp; đề thi</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="questions">Quản lý ngân hàng câu hỏi</div>
+              <div class="uc" data-uc="exams">Quản lý đề thi</div>
+              <div class="uc" data-uc="publish">Xuất bản đề thi</div>
+            </div>
+          </div>
+
+          <div class="group teacher" data-group="F">
+            <span class="group-label">F</span><h4>Phòng thi &amp; kết quả</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="rooms">Quản lý phòng thi</div>
+              <div class="uc" data-uc="roster">Quản lý danh sách thí sinh</div>
+              <div class="uc" data-uc="rosterImport">Nhập danh sách từ Excel</div>
+              <div class="uc" data-uc="results">Xem kết quả &amp; lịch sử làm bài</div>
+              <div class="uc" data-uc="violations">Xem vi phạm giám sát</div>
+            </div>
+          </div>
+
+          <div class="group student span2" data-group="G">
+            <span class="group-label">G</span><h4>Thi trực tuyến</h4>
+            <div class="ucs-list">
+              <div class="uc" data-uc="examList">Xem danh sách đề thi được giao</div>
+              <div class="uc" data-uc="takeExam">Làm bài thi</div>
+              <div class="uc" data-uc="submit">Nộp bài thi</div>
+              <div class="uc" data-uc="autoSubmit">Tự động nộp khi vi phạm / hết giờ</div>
+              <div class="uc" data-uc="myResults">Xem kết quả cá nhân</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Kéo ngang để xem toàn bộ sơ đồ trên màn hình nhỏ.</p>
+
+  <section class="notes">
+    <h3>Ghi chú nghiệp vụ phản ánh trong sơ đồ</h3>
+    <ul>
+      <li>Giáo viên chỉ quản lý được câu hỏi, đề thi và phòng thi do chính mình tạo — không có khái niệm "giáo viên phụ trách lớp" trung gian.</li>
+      <li><code>Quản lý phòng thi</code> chỉ thực hiện được khi đề đã ở trạng thái <code>published</code>; phòng thi gắn trực tiếp với một đề cụ thể thay vì một lớp cố định.</li>
+      <li>Hai luồng nhập Excel (người dùng ở nhóm B, danh sách thí sinh ở nhóm F) dùng chung một mẫu thao tác: tải file mẫu → điền dữ liệu → nhập lại, dòng trùng/không hợp lệ sẽ bị bỏ qua và báo cáo lại.</li>
+      <li>Tài liệu trong nhóm D/A có thể gắn với một môn học hoặc để trống (không bắt buộc); mọi vai trò đều xem và tải về được, chỉ Admin và Giáo viên mới tải lên/xoá.</li>
+      <li><code>Tự động nộp khi vi phạm / hết giờ</code> là một "extend" của việc làm bài — hệ thống tự nộp thay sinh viên khi phát hiện vi phạm giám sát hoặc hết thời gian phòng thi.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function(){
+  var GROUPS = [
+    { id:'B', internal:[
+      {from:'usersImport', to:'users', type:'extend'},
+      {from:'usersTemplate', to:'usersImport', type:'extend'},
+    ]},
+    { id:'E', internal:[
+      {from:'publish', to:'exams', type:'extend'},
+    ]},
+    { id:'F', internal:[
+      {from:'rooms', to:'roster', type:'include'},
+      {from:'rosterImport', to:'roster', type:'extend'},
+      {from:'results', to:'violations', type:'include'},
+    ]},
+    { id:'G', internal:[
+      {from:'takeExam', to:'submit', type:'include'},
+      {from:'autoSubmit', to:'takeExam', type:'extend'},
+    ]},
+  ];
+  var ACTOR_LINKS = [
+    ['admin','A'],['admin','B'],['admin','C'],['admin','D'],
+    ['teacher','A'],['teacher','D'],['teacher','E'],['teacher','F'],
+    ['student','A'],['student','G'],
+  ];
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  function rectOf(sel, boardRect){
+    var el = typeof sel === 'string' ? document.querySelector(sel) : sel;
+    if(!el) return null;
+    var r = el.getBoundingClientRect();
+    return {
+      left:r.left-boardRect.left, right:r.right-boardRect.left,
+      top:r.top-boardRect.top, bottom:r.bottom-boardRect.top,
+      cx:(r.left+r.right)/2-boardRect.left, cy:(r.top+r.bottom)/2-boardRect.top,
+    };
+  }
+  function el(tag, attrs){
+    var e = document.createElementNS(SVGNS, tag);
+    for(var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function layout(){
+    var board = document.getElementById('board');
+    var svg = document.getElementById('connectors');
+    var boardRect = board.getBoundingClientRect();
+
+    while(svg.children.length > 1) svg.removeChild(svg.lastChild);
+    svg.setAttribute('width', board.scrollWidth);
+    svg.setAttribute('height', board.scrollHeight);
+
+    ACTOR_LINKS.forEach(function(pair){
+      var a = rectOf('[data-actor="'+pair[0]+'"]', boardRect);
+      var g = rectOf('[data-group="'+pair[1]+'"]', boardRect);
+      if(!a || !g) return;
+      var x1=a.right, y1=a.cy, x2=g.left, y2=g.cy, midx=(x1+x2)/2;
+      var d = 'M '+x1+' '+y1+' C '+midx+' '+y1+', '+midx+' '+y2+', '+x2+' '+y2;
+      svg.appendChild(el('path',{ d:d, class:'assoc-line' }));
+    });
+
+    GROUPS.forEach(function(grp){
+      (grp.internal||[]).forEach(function(rel){
+        var f = rectOf('[data-uc="'+rel.from+'"]', boardRect);
+        var t = rectOf('[data-uc="'+rel.to+'"]', boardRect);
+        if(!f || !t) return;
+        var dist = Math.abs(t.cy - f.cy);
+        var off = Math.max(34, Math.min(60, dist/2.1));
+        var x1=f.right, y1=f.cy, x2=t.right, y2=t.cy;
+        var c1x=x1+off, c1y=y1, c2x=x2+off, c2y=y2;
+        var d = 'M '+x1+' '+y1+' C '+c1x+' '+c1y+', '+c2x+' '+c2y+', '+x2+' '+y2;
+        svg.appendChild(el('path',{ d:d, class:'rel-line', 'marker-end':'url(#arrow)' }));
+
+        var bx = 0.125*x1+0.375*c1x+0.375*c2x+0.125*x2;
+        var by = 0.125*y1+0.375*c1y+0.375*c2y+0.125*y2;
+        var label = rel.type === 'include' ? '«include»' : '«extend»';
+        var w = label.length * 5.6 + 10;
+        svg.appendChild(el('rect',{ x:bx-w/2, y:by-9, width:w, height:18, rx:5, class:'rel-label-bg' }));
+        var text = el('text',{ x:bx, y:by+3.5, 'text-anchor':'middle', class:'rel-label-text' });
+        text.textContent = label;
+        svg.appendChild(text);
+      });
+    });
+  }
+
+  function run(){ layout(); requestAnimationFrame(layout); }
+  if(document.readyState === 'complete') run();
+  else window.addEventListener('load', run);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+  window.addEventListener('resize', run);
+})();
+</script>

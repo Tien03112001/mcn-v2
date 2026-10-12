@@ -1,0 +1,480 @@
+<title>Use Case Chi Tiết Hệ Thống</title>
+<style>
+/*
+  Layout: plain UML notation to match a reference diagram — white elliptical
+  use-case bubbles, stick-figure actors, straight connector lines computed
+  from live DOM rects (never hand-measured), hollow-triangle generalization,
+  dashed open-arrow include/extend. One overview stage + N detail stages,
+  each stage rendered by the same generic connector engine.
+*/
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --ink:#20262e; --ink-dim:#5c6572; --line:#333a44;
+  --accent:#2f5d8a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11151a; --surface:#1b2129; --ink:#e7eaee; --ink-dim:#9aa4b0; --line:#aeb6c0;
+    --accent:#8fbbe6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11151a; --surface:#1b2129; --ink:#e7eaee; --ink-dim:#9aa4b0; --line:#aeb6c0;
+  --accent:#8fbbe6; color-scheme:dark;
+}
+*{box-sizing:border-box;}
+body{ background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; padding-inline:16px; padding-block:28px 48px; display:flex; justify-content:center; }
+.page{ width:100%; max-width:1280px; display:flex; flex-direction:column; gap:30px; }
+h1{ font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(21px,4vw,28px); margin:0; letter-spacing:-0.01em; text-wrap:balance; }
+.subtitle{ margin:6px 0 0; color:var(--ink-dim); font-size:14px; max-width:78ch; }
+h2{ font-family:'Sora',sans-serif; font-size:17px; margin:0; }
+.section-intro{ color:var(--ink-dim); font-size:13.5px; margin:2px 0 0; }
+
+.legend{
+  display:flex; flex-wrap:wrap; gap:18px; align-items:center; font-size:12.5px; color:var(--ink-dim);
+  border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:10px 16px;
+}
+.legend .item{ display:flex; align-items:center; gap:7px; white-space:nowrap; }
+
+.scroller{ overflow-x:auto; border-radius:14px; border:1px solid var(--line); background:var(--surface); padding:26px 22px; }
+
+/* ---- shared stage primitives ---- */
+.stage{ position:relative; }
+.stage svg.connectors{ position:absolute; inset:0; overflow:visible; pointer-events:none; }
+.actor-card{ display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; z-index:2; }
+.actor-card svg{ color:var(--ink); }
+.actor-card .name{ font-family:'Sora',sans-serif; font-weight:700; font-size:12.5px; white-space:nowrap; }
+.actor-card .tag{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.03em; }
+
+.uc-oval{
+  position:relative; z-index:2; display:flex; align-items:center; justify-content:center; text-align:center;
+  border:1.6px solid var(--line); border-radius:50%/100%; background:var(--surface);
+  padding:14px 26px; font-size:12.6px; font-weight:500; line-height:1.3; min-height:52px;
+  white-space:nowrap;
+}
+.uc-oval.wrap{ white-space:normal; width:200px; }
+.uc-oval.base-oval{ font-weight:700; }
+
+/* ---- overview stage ---- */
+#overviewStage{ min-width:1180px; display:flex; flex-direction:column; gap:30px; padding:10px 20px; }
+.row{ display:flex; }
+.top-row{ justify-content:space-between; gap:50px; }
+.cluster{ display:flex; align-items:center; gap:18px; }
+.cluster.teacher-cluster{ flex-direction:row-reverse; }
+.ovals-col{ display:flex; flex-direction:column; gap:12px; }
+.docs-row{ justify-content:center; }
+.mid-row{ flex-direction:column; align-items:center; gap:16px; }
+.ovals-row{ display:flex; gap:12px; flex-wrap:nowrap; }
+.bottom-row{ justify-content:flex-start; padding-left:40px; }
+
+/* ---- detail stage ---- */
+.group-header{ font-family:'Sora',sans-serif; font-weight:700; font-size:13.5px; color:var(--accent); margin:6px 0 -4px; padding-top:10px; border-top:1px dashed var(--line); }
+.group-header:first-child{ border-top:none; padding-top:0; }
+.detail-card{ border:1px solid var(--line); border-radius:12px; padding:18px 20px 22px; background:var(--surface); }
+.detail-card h3{ margin:0 0 4px; font-family:'Sora',sans-serif; font-size:14.5px; }
+.detail-card .role-line{ margin:0 0 14px; font-size:12px; color:var(--ink-dim); font-family:'JetBrains Mono',monospace; }
+.detail-stage{ display:flex; align-items:center; gap:56px; min-width:760px; padding:16px 12px; }
+.actors-col{ display:flex; flex-direction:column; justify-content:center; gap:26px; }
+.core-col{ display:flex; flex-direction:column; align-items:center; gap:50px; }
+.extends-col{ display:flex; flex-direction:column; justify-content:center; gap:16px; }
+
+.hint{ font-size:12px; color:var(--ink-dim); text-align:right; margin:-16px 0 0; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+<div class="page">
+  <header>
+    <h1>Use Case Tổng Quát &amp; Chi Tiết — Hệ Thống Thi Online</h1>
+    <p class="subtitle">Ký hiệu UML chuẩn: đường liền không mũi tên = liên kết (association); tam giác rỗng = tổng quát hoá (generalization); đường đứt nét có mũi tên hở = «include»/«extend».</p>
+  </header>
+
+  <div class="legend">
+    <span class="item"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="var(--ink)" stroke-width="1.4"/></svg> Association</span>
+    <span class="item"><svg width="34" height="14"><line x1="1" y1="7" x2="20" y2="7" stroke="var(--ink)" stroke-width="1.4"/><path d="M20,1 L33,7 L20,13 Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.3"/></svg> Generalization</span>
+    <span class="item"><svg width="34" height="10"><line x1="1" y1="5" x2="25" y2="5" stroke="var(--ink-dim)" stroke-width="1.3" stroke-dasharray="4 3"/><path d="M25,2 L32,5 L25,8" fill="none" stroke="var(--ink-dim)" stroke-width="1.3"/></svg> «include» / «extend»</span>
+  </div>
+
+  <section style="display:flex; flex-direction:column; gap:12px;">
+    <div>
+      <h2>1. Sơ đồ Use Case tổng quát</h2>
+      <p class="section-intro">Người dùng là actor trừu tượng gom các chức năng chung (đăng nhập, đổi mật khẩu, tài liệu…); Admin, Giáo viên, Sinh viên đều tổng quát hoá từ Người dùng và có thêm nhóm chức năng riêng.</p>
+    </div>
+    <div class="scroller">
+      <div class="stage" id="overviewStage">
+        <div class="row top-row">
+          <div class="cluster admin-cluster">
+            <div class="actor-card" data-actor="admin">
+              <svg width="38" height="52" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+                <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+                <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+              </svg>
+              <span class="name">Quản trị viên</span><span class="tag">Admin</span>
+            </div>
+            <div class="ovals-col">
+              <div class="uc-oval" data-uc="admin-users">Quản lý người dùng</div>
+              <div class="uc-oval" data-uc="admin-subjects">Quản lý môn học &amp; chủ đề</div>
+              <div class="uc-oval" data-uc="admin-tags">Quản lý thẻ gắn nhãn</div>
+              <div class="uc-oval" data-uc="admin-stats">Xem thống kê hệ thống</div>
+            </div>
+          </div>
+          <div class="cluster teacher-cluster">
+            <div class="actor-card" data-actor="teacher">
+              <svg width="38" height="52" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+                <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+                <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+              </svg>
+              <span class="name">Giáo viên</span><span class="tag">Teacher</span>
+            </div>
+            <div class="ovals-col">
+              <div class="uc-oval" data-uc="t-questions">Quản lý ngân hàng câu hỏi</div>
+              <div class="uc-oval" data-uc="t-exams">Quản lý đề thi</div>
+              <div class="uc-oval" data-uc="t-rooms">Quản lý phòng thi</div>
+              <div class="uc-oval" data-uc="t-results">Xem kết quả &amp; lịch sử làm bài</div>
+              <div class="uc-oval" data-uc="t-violations">Xem vi phạm giám sát</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row docs-row">
+          <div class="uc-oval base-oval" data-uc="docs">Quản lý tài liệu dùng chung</div>
+        </div>
+
+        <div class="row mid-row">
+          <div class="ovals-row">
+            <div class="uc-oval" data-uc="u-login">Đăng nhập</div>
+            <div class="uc-oval" data-uc="u-logout">Đăng xuất</div>
+            <div class="uc-oval" data-uc="u-changepw">Đổi mật khẩu</div>
+            <div class="uc-oval" data-uc="u-profile">Xem thông tin cá nhân</div>
+            <div class="uc-oval" data-uc="u-viewdoc">Xem &amp; tải tài liệu</div>
+          </div>
+          <div class="actor-card" data-actor="user">
+            <svg width="38" height="52" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+              <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+              <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+            </svg>
+            <span class="name">Người dùng</span><span class="tag">Base actor</span>
+          </div>
+        </div>
+
+        <div class="row bottom-row">
+          <div class="cluster admin-cluster">
+            <div class="actor-card" data-actor="student">
+              <svg width="38" height="52" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>
+                <line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>
+                <line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/>
+              </svg>
+              <span class="name">Sinh viên</span><span class="tag">Student</span>
+            </div>
+            <div class="ovals-col">
+              <div class="uc-oval" data-uc="s-examlist">Xem danh sách đề thi được giao</div>
+              <div class="uc-oval" data-uc="s-takeexam">Làm bài thi</div>
+              <div class="uc-oval" data-uc="s-myresults">Xem kết quả cá nhân</div>
+            </div>
+          </div>
+        </div>
+
+        <svg class="connectors"></svg>
+      </div>
+    </div>
+    <p class="hint">Kéo ngang để xem toàn bộ sơ đồ trên màn hình nhỏ.</p>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:16px;">
+    <div>
+      <h2>2. Sơ đồ Use Case chi tiết theo từng chức năng</h2>
+      <p class="section-intro">Mỗi sơ đồ chi tiết hoá một chức năng quản lý ở mức tổng quát thành các thao tác cụ thể («extend»), và nêu rõ chức năng nào bắt buộc phải đăng nhập trước («include»).</p>
+    </div>
+    <div class="scroller" style="display:flex; flex-direction:column; gap:20px;" id="detailsContainer"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){ var e=document.createElementNS(SVGNS, tag); for(var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function actorSvg(){
+    return '<svg width="34" height="46" viewBox="0 0 40 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">'+
+      '<circle cx="20" cy="10" r="8"/><line x1="20" y1="18" x2="20" y2="38"/>'+
+      '<line x1="20" y1="24" x2="6" y2="32"/><line x1="20" y1="24" x2="34" y2="32"/>'+
+      '<line x1="20" y1="38" x2="8" y2="54"/><line x1="20" y1="38" x2="32" y2="54"/></svg>';
+  }
+
+  // ---- generic connector engine: works for the overview stage and every detail stage ----
+  function rectOf(elm, originRect){
+    var r = elm.getBoundingClientRect();
+    return {
+      left:r.left-originRect.left, right:r.right-originRect.left,
+      top:r.top-originRect.top, bottom:r.bottom-originRect.top,
+      cx:(r.left+r.right)/2-originRect.left, cy:(r.top+r.bottom)/2-originRect.top,
+    };
+  }
+  function borderPoint(rect, ocx, ocy){
+    var dx = ocx-rect.cx, dy = ocy-rect.cy;
+    var halfW=(rect.right-rect.left)/2, halfH=(rect.bottom-rect.top)/2;
+    if(dx===0 && dy===0) return {x:rect.cx,y:rect.cy};
+    var tx = dx!==0 ? halfW/Math.abs(dx) : Infinity;
+    var ty = dy!==0 ? halfH/Math.abs(dy) : Infinity;
+    var t = Math.min(tx,ty);
+    return { x:rect.cx+dx*t, y:rect.cy+dy*t };
+  }
+  // conn.kind: 'assoc' | 'gen' | 'rel' (include/extend, conn.label set)
+  function renderStage(stageEl, conns){
+    var svg = stageEl.querySelector('svg.connectors');
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var defs = el('defs',{});
+    defs.appendChild((function(){
+      var m = el('marker',{ id:'open-'+stageEl.id, viewBox:'0 0 12 12', refX:9, refY:6, markerWidth:7, markerHeight:7, orient:'auto' });
+      m.appendChild(el('path',{ d:'M1,1 L10,6 L1,11', fill:'none', stroke:'var(--ink-dim)', 'stroke-width':1.6 }));
+      return m;
+    })());
+    defs.appendChild((function(){
+      var m = el('marker',{ id:'gen-'+stageEl.id, viewBox:'0 0 16 12', refX:14, refY:6, markerWidth:11, markerHeight:9, orient:'auto' });
+      m.appendChild(el('path',{ d:'M1,1 L15,6 L1,11 Z', fill:'var(--surface)', stroke:'var(--ink)', 'stroke-width':1.3 }));
+      return m;
+    })());
+    svg.appendChild(defs);
+
+    var originRect = stageEl.getBoundingClientRect();
+    svg.setAttribute('width', stageEl.scrollWidth);
+    svg.setAttribute('height', stageEl.scrollHeight);
+
+    conns.forEach(function(c){
+      var ra = rectOf(c.a, originRect), rb = rectOf(c.b, originRect);
+      var p1 = borderPoint(ra, rb.cx, rb.cy), p2 = borderPoint(rb, ra.cx, ra.cy);
+      var attrs = { x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y };
+      if(c.kind === 'assoc'){
+        attrs.stroke = 'var(--ink)'; attrs['stroke-width'] = 1.4;
+      } else if(c.kind === 'gen'){
+        attrs.stroke = 'var(--ink)'; attrs['stroke-width'] = 1.4;
+        attrs['marker-end'] = 'url(#gen-'+stageEl.id+')';
+      } else {
+        attrs.stroke = 'var(--ink-dim)'; attrs['stroke-width'] = 1.3;
+        attrs['stroke-dasharray'] = '5 4';
+        attrs['marker-end'] = 'url(#open-'+stageEl.id+')';
+      }
+      svg.appendChild(el('line', attrs));
+      if(c.label){
+        var mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+        var w = c.label.length*5.6+10;
+        svg.appendChild(el('rect',{ x:mx-w/2, y:my-9, width:w, height:18, rx:5, fill:'var(--surface)', stroke:'var(--line)', 'stroke-width':1 }));
+        var t = el('text',{ x:mx, y:my+3.3, 'text-anchor':'middle', 'font-family':"'JetBrains Mono',monospace", 'font-size':9.5, fill:'var(--ink-dim)' });
+        t.textContent = c.label;
+        svg.appendChild(t);
+      }
+    });
+  }
+
+  function q(sel){ return document.querySelector(sel); }
+  function qa(root,sel){ return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+
+  function buildOverviewConns(){
+    var stage = document.getElementById('overviewStage');
+    var byUc = function(id){ return stage.querySelector('[data-uc="'+id+'"]'); };
+    var byActor = function(id){ return stage.querySelector('[data-actor="'+id+'"]'); };
+    var admin=byActor('admin'), teacher=byActor('teacher'), student=byActor('student'), user=byActor('user');
+    var conns = [];
+    ['admin-users','admin-subjects','admin-tags','admin-stats'].forEach(function(id){ conns.push({a:admin,b:byUc(id),kind:'assoc'}); });
+    ['t-questions','t-exams','t-rooms','t-results','t-violations'].forEach(function(id){ conns.push({a:teacher,b:byUc(id),kind:'assoc'}); });
+    conns.push({a:admin,b:byUc('docs'),kind:'assoc'});
+    conns.push({a:teacher,b:byUc('docs'),kind:'assoc'});
+    ['u-login','u-logout','u-changepw','u-profile','u-viewdoc'].forEach(function(id){ conns.push({a:user,b:byUc(id),kind:'assoc'}); });
+    ['s-examlist','s-takeexam','s-myresults'].forEach(function(id){ conns.push({a:student,b:byUc(id),kind:'assoc'}); });
+    conns.push({a:admin,b:user,kind:'gen'});
+    conns.push({a:teacher,b:user,kind:'gen'});
+    conns.push({a:student,b:user,kind:'gen'});
+    renderStage(stage, conns);
+  }
+
+  function ext(id,label,parent){ return { id:id, label:label, parent:parent }; }
+
+  var DETAILS = [
+    { key:'d1', group:'Quản trị viên (Admin)', title:'Quản lý người dùng', actors:['Quản trị viên'],
+      base:'Quản lý người dùng',
+      extend:[
+        ext('add','Thêm người dùng'),
+        ext('edit','Sửa người dùng'),
+        ext('toggle','Vô hiệu hoá / kích hoạt người dùng'),
+        ext('resetpw','Đặt lại mật khẩu'),
+        ext('filterrole','Lọc theo vai trò'),
+        ext('import','Nhập người dùng từ Excel'),
+        ext('template','Tải file mẫu Excel','import'),
+      ] },
+    { key:'d2', group:'Quản trị viên (Admin)', title:'Quản lý danh mục tham chiếu', actors:['Quản trị viên'],
+      base:'Quản lý danh mục tham chiếu',
+      extend:[
+        ext('addsubject','Thêm môn học'),
+        ext('editsubject','Sửa / xoá môn học'),
+        ext('addtopic','Thêm chủ đề cho môn học'),
+        ext('addtag','Thêm thẻ gắn nhãn'),
+        ext('deltag','Xoá thẻ gắn nhãn'),
+      ] },
+    { key:'d3', group:'Quản trị viên (Admin)', title:'Xem thống kê tổng quan hệ thống', actors:['Quản trị viên'],
+      base:'Xem thống kê tổng quan hệ thống',
+      extend:[
+        ext('users','Xem số liệu người dùng & phòng thi'),
+        ext('content','Xem số liệu câu hỏi & đề thi'),
+        ext('trend','Xem xu hướng lượt thi theo ngày'),
+        ext('recent','Xem danh sách lượt thi gần đây'),
+        ext('upcoming','Xem phòng thi sắp mở'),
+      ] },
+    { key:'d4', group:'Giáo viên', title:'Quản lý ngân hàng câu hỏi', actors:['Giáo viên'],
+      base:'Quản lý ngân hàng câu hỏi',
+      extend:[
+        ext('add','Thêm câu hỏi'),
+        ext('edit','Sửa câu hỏi'),
+        ext('delete','Xoá câu hỏi'),
+        ext('fsubject','Lọc theo môn học'),
+        ext('ftopic','Lọc theo chủ đề'),
+        ext('ftag','Lọc theo thẻ gắn nhãn'),
+        ext('fdiff','Lọc theo độ khó'),
+      ] },
+    { key:'d5', group:'Giáo viên', title:'Quản lý đề thi', actors:['Giáo viên'],
+      base:'Quản lý đề thi',
+      extend:[
+        ext('create','Tạo đề thi'),
+        ext('edit','Sửa đề thi'),
+        ext('addq','Thêm câu hỏi vào đề'),
+        ext('removeq','Xoá câu hỏi khỏi đề'),
+        ext('publish','Xuất bản đề thi'),
+        ext('delete','Xoá đề thi'),
+      ] },
+    { key:'d6', group:'Giáo viên', title:'Quản lý phòng thi', actors:['Giáo viên'],
+      base:'Quản lý phòng thi',
+      extend:[
+        ext('create','Tạo phòng thi'),
+        ext('schedule','Sửa thời gian mở / đóng phòng'),
+        ext('delete','Xoá phòng thi'),
+        ext('addmanual','Thêm thí sinh thủ công'),
+        ext('import','Nhập danh sách thí sinh từ Excel'),
+        ext('removestudent','Xoá thí sinh khỏi phòng'),
+      ] },
+    { key:'d7', group:'Giáo viên', title:'Xem kết quả & lịch sử làm bài', actors:['Giáo viên'],
+      base:'Xem kết quả & lịch sử làm bài',
+      extend:[
+        ext('froom','Lọc theo phòng thi'),
+        ext('score','Xem điểm & thời gian nộp'),
+        ext('answers','Xem chi tiết đáp án đã chọn'),
+      ] },
+    { key:'d8', group:'Giáo viên', title:'Xem vi phạm giám sát', actors:['Giáo viên'],
+      base:'Xem vi phạm giám sát',
+      extend:[
+        ext('froom','Lọc vi phạm theo phòng thi'),
+        ext('type','Xem loại vi phạm'),
+        ext('time','Xem thời điểm vi phạm'),
+      ] },
+    { key:'d9', group:'Sinh viên', title:'Làm bài thi', actors:['Sinh viên'],
+      base:'Làm bài thi',
+      extend:[
+        ext('viewlist','Xem danh sách đề thi được giao'),
+        ext('start','Bắt đầu làm bài'),
+        ext('answer','Trả lời & lưu đáp án'),
+        ext('submit','Nộp bài thi'),
+        ext('autosubmit','Tự động nộp khi hết giờ / vi phạm'),
+      ] },
+    { key:'d10', group:'Sinh viên', title:'Xem kết quả cá nhân', actors:['Sinh viên'],
+      base:'Xem kết quả cá nhân',
+      extend:[
+        ext('score','Xem điểm số sau khi nộp'),
+        ext('history','Xem lịch sử các lần làm bài'),
+        ext('detail','Xem chi tiết từng lượt thi'),
+      ] },
+    { key:'d11', group:'Dùng chung (Admin & Giáo viên)', title:'Quản lý tài liệu dùng chung', actors:['Quản trị viên','Giáo viên'],
+      base:'Quản lý tài liệu dùng chung',
+      extend:[
+        ext('upload','Tải lên tài liệu'),
+        ext('preview','Xem trước tài liệu'),
+        ext('download','Tải tài liệu về'),
+        ext('delete','Xoá tài liệu'),
+        ext('fsubject','Lọc theo môn học'),
+        ext('fuploader','Lọc theo người tải lên'),
+        ext('fdate','Lọc theo thời gian tải lên'),
+      ] },
+  ];
+
+  function buildDetail(cfg, index){
+    var card = document.createElement('div');
+    card.className = 'detail-card';
+    card.innerHTML = '<h3>2.'+index+'. '+cfg.title+'</h3>'+
+      '<p class="role-line">Actor: '+cfg.actors.join(', ')+'</p>'+
+      '<div class="stage detail-stage" id="stage-'+cfg.key+'">'+
+        '<div class="actors-col"></div>'+
+        '<div class="core-col">'+
+          '<div class="uc-oval" data-uc="'+cfg.key+'-login">Đăng nhập</div>'+
+          '<div class="uc-oval base-oval" data-uc="'+cfg.key+'-base">'+cfg.base+'</div>'+
+        '</div>'+
+        '<div class="extends-col"></div>'+
+        '<svg class="connectors"></svg>'+
+      '</div>';
+    var stage = card.querySelector('.detail-stage');
+    var actorsCol = stage.querySelector('.actors-col');
+    cfg.actors.forEach(function(name, i){
+      var d = document.createElement('div');
+      d.className = 'actor-card';
+      d.setAttribute('data-actor', cfg.key+'-a'+i);
+      d.innerHTML = actorSvg()+'<span class="name">'+name+'</span>';
+      actorsCol.appendChild(d);
+    });
+    var extCol = stage.querySelector('.extends-col');
+    cfg.extend.forEach(function(item){
+      var d = document.createElement('div');
+      d.className = 'uc-oval wrap';
+      d.setAttribute('data-uc', cfg.key+'-'+item.id);
+      d.textContent = item.label;
+      extCol.appendChild(d);
+    });
+    document.getElementById('detailsContainer').appendChild(card);
+    return stage;
+  }
+
+  function buildDetailConns(stage, cfg){
+    var base = stage.querySelector('[data-uc="'+cfg.key+'-base"]');
+    var login = stage.querySelector('[data-uc="'+cfg.key+'-login"]');
+    var extMap = {};
+    cfg.extend.forEach(function(item){ extMap[item.id] = stage.querySelector('[data-uc="'+cfg.key+'-'+item.id+'"]'); });
+    var conns = [];
+    cfg.actors.forEach(function(_, i){
+      conns.push({ a: stage.querySelector('[data-actor="'+cfg.key+'-a'+i+'"]'), b: base, kind:'assoc' });
+    });
+    conns.push({ a: base, b: login, kind:'rel', label:'«include»' });
+    cfg.extend.forEach(function(item){
+      var target = item.parent ? extMap[item.parent] : base;
+      conns.push({ a: extMap[item.id], b: target, kind:'rel', label:'«extend»' });
+    });
+    renderStage(stage, conns);
+  }
+
+  var builtOnce = false;
+  function build(){
+    var container = document.getElementById('detailsContainer');
+    container.innerHTML = '';
+    var lastGroup = null;
+    return DETAILS.map(function(cfg, i){
+      if(cfg.group !== lastGroup){
+        lastGroup = cfg.group;
+        var h = document.createElement('div');
+        h.className = 'group-header';
+        h.textContent = cfg.group;
+        container.appendChild(h);
+      }
+      return { stage: buildDetail(cfg, i+1), cfg: cfg };
+    });
+  }
+  var detailStages = [];
+  function layoutAll(){
+    buildOverviewConns();
+    detailStages.forEach(function(s){ buildDetailConns(s.stage, s.cfg); });
+  }
+  function runAll(){
+    if(!builtOnce){ detailStages = build(); builtOnce = true; }
+    requestAnimationFrame(layoutAll);
+  }
+  if(document.readyState === 'complete') runAll();
+  else window.addEventListener('load', runAll);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(runAll);
+  window.addEventListener('resize', layoutAll);
+})();
+</script>
