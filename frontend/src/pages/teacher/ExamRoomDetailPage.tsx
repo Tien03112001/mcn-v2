@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/api-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -95,7 +96,7 @@ export default function ExamRoomDetailPage() {
       setSelectedStudentId('')
       queryClient.invalidateQueries({ queryKey: studentsBaseKey })
     },
-    onError: () => toast.error('Không thể thêm sinh viên vào phòng thi'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể thêm sinh viên vào phòng thi')),
   })
 
   const importMutation = useMutation({
@@ -104,7 +105,7 @@ export default function ExamRoomDetailPage() {
       toast.success(`Import thành công: ${result.created} SV mới, ${result.enrolled} lượt ghi danh`)
       queryClient.invalidateQueries({ queryKey: studentsBaseKey })
     },
-    onError: () => toast.error('Import thất bại. Kiểm tra định dạng file Excel.'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Import thất bại. Kiểm tra định dạng file Excel.')),
     onSettled: () => setIsImporting(false),
   })
 

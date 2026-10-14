@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/api-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -114,7 +115,7 @@ export default function QuestionEditorPage() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'questions'] })
       navigate('/teacher/questions')
     },
-    onError: () => toast.error('Không thể lưu câu hỏi'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể lưu câu hỏi')),
   })
 
   function updateOption(index: number, patch: Partial<QuestionOption>) {

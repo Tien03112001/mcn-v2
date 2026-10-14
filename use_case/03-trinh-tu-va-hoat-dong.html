@@ -1,0 +1,869 @@
+<title>Trình Tự & Hoạt Động Thi Online</title>
+<style>
+/*
+  Two generic engines, data-driven, reused across 5 flows:
+  - renderSequence: lifelines + numbered sync/return/self arrows + alt/loop frames
+  - renderActivity: swimlane grid of start/action/decision/end nodes + arrows
+  Both compute connector geometry from live DOM rects, never hand-measured.
+*/
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --ink:#20262e; --ink-dim:#5c6572; --line:#333a44; --accent:#2f5d8a;
+}
+*{box-sizing:border-box;}
+body{ background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; padding-inline:16px; padding-block:28px 48px; display:flex; justify-content:center; }
+.page{ width:100%; max-width:1180px; display:flex; flex-direction:column; gap:30px; }
+h1{ font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(21px,4vw,28px); margin:0; letter-spacing:-0.01em; text-wrap:balance; }
+.subtitle{ margin:6px 0 0; color:var(--ink-dim); font-size:14px; max-width:80ch; }
+h2{ font-family:'Sora',sans-serif; font-size:17px; margin:0 0 2px; color:var(--accent); }
+h3{ font-family:'Sora',sans-serif; font-size:14px; margin:0 0 10px; }
+.flow-section{ display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--line); padding-top:22px; }
+.flow-section:first-of-type{ border-top:none; padding-top:0; }
+
+.legend{ display:flex; flex-wrap:wrap; gap:16px 22px; align-items:center; font-size:12px; color:var(--ink-dim); border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:10px 16px; }
+.legend .item{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+
+.diagram-card{ border:1px solid var(--line); border-radius:12px; background:var(--surface); padding:18px 18px 16px; }
+.scroller{ overflow-x:auto; }
+.fig-caption{ text-align:center; font-size:12.5px; color:var(--accent); margin:10px 0 0; font-style:italic; }
+
+/* ---- sequence stage ---- */
+.seq-stage{ position:relative; min-width:700px; }
+.seq-head{ position:absolute; top:0; transform:translateX(-50%); border:1.4px solid var(--ink); border-radius:6px; background:var(--surface); padding:7px 12px; font-size:12px; font-weight:600; text-align:center; white-space:nowrap; z-index:2; }
+.seq-stage svg{ position:relative; z-index:1; overflow:visible; }
+.seq-lifeline{ stroke:var(--ink-dim); stroke-width:1.2; stroke-dasharray:4 4; }
+.seq-msg-line{ stroke:var(--ink); stroke-width:1.3; }
+.seq-return-line{ stroke:var(--ink); stroke-width:1.2; stroke-dasharray:5 4; }
+.seq-label{ font-family:'Inter',sans-serif; font-size:11px; fill:var(--ink); }
+.seq-frame-rect{ fill:none; stroke:var(--ink-dim); stroke-width:1.2; }
+.seq-frame-tag{ fill:var(--surface); stroke:var(--ink-dim); stroke-width:1.2; }
+.seq-frame-tag-text{ font-family:'JetBrains Mono',monospace; font-size:10px; fill:var(--ink); font-weight:700; }
+.seq-guard{ font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-dim); font-style:italic; }
+.seq-divider{ stroke:var(--ink-dim); stroke-width:1; stroke-dasharray:4 3; }
+
+/* ---- activity stage ---- */
+.act-stage{ position:relative; min-width:620px; }
+.act-lanes{ display:grid; column-gap:60px; margin-bottom:6px; }
+.act-lane-head{ text-align:center; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.04em; border-bottom:1.4px solid var(--line); padding-bottom:8px; }
+.act-grid{ position:relative; display:grid; column-gap:60px; row-gap:30px; padding:10px 6px 20px; }
+.act-grid svg{ position:absolute; inset:0; overflow:visible; pointer-events:none; z-index:1; }
+.act-node{ position:relative; z-index:2; justify-self:center; align-self:center; }
+.act-start{ width:22px; height:22px; border-radius:50%; background:var(--ink); }
+.act-end{ width:28px; height:28px; border-radius:50%; border:2px solid var(--ink); display:flex; align-items:center; justify-content:center; background:var(--surface); }
+.act-end::after{ content:""; width:16px; height:16px; border-radius:50%; background:var(--ink); }
+.act-action{ border:1.4px solid var(--ink); border-radius:10px; background:var(--surface); padding:10px 16px; font-size:12.2px; text-align:center; line-height:1.35; min-width:168px; max-width:210px; }
+.act-decision{ width:176px; height:106px; background:var(--surface); border:1.4px solid var(--ink); display:flex; align-items:center; justify-content:center; text-align:center; font-size:10.3px; line-height:1.3; padding:22px 16px; clip-path:polygon(50% 1%,99% 50%,50% 99%,1% 50%); }
+.act-edge-label{ font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-dim); }
+.act-edge-label-bg{ fill:var(--surface); }
+.act-arrow{ stroke:var(--ink); stroke-width:1.3; fill:none; }
+
+.hint{ font-size:12px; color:var(--ink-dim); text-align:right; margin:4px 0 0; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+<div class="page">
+  <header>
+    <h1>Biểu đồ Trình tự &amp; Biểu đồ Hoạt động — 10 chức năng chi tiết</h1>
+    <p class="subtitle">Theo đúng mẫu "Đăng nhập" đã có: mỗi chức năng gồm 1 biểu đồ trình tự (sequence) và 1 biểu đồ hoạt động (activity). Nội dung bám sát đúng luồng xử lý, tên trường dữ liệu và mã lỗi thật trong code backend (controller, validator, service) — bao phủ toàn bộ các use case chi tiết đã liệt kê ở file 02.</p>
+  </header>
+
+  <div class="legend">
+    <span class="item"><svg width="30" height="8"><line x1="1" y1="4" x2="29" y2="4" stroke="var(--ink)" stroke-width="1.3"/></svg> Gọi đồng bộ</span>
+    <span class="item"><svg width="30" height="8"><line x1="1" y1="4" x2="29" y2="4" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="5 4"/></svg> Phản hồi</span>
+    <span class="item"><svg width="16" height="16"><rect x="1" y="1" width="14" height="14" fill="none" stroke="var(--ink-dim)" stroke-width="1.2"/></svg> Khung alt / loop (điều kiện rẽ nhánh, lặp)</span>
+    <span class="item"><svg width="14" height="14"><circle cx="7" cy="7" r="7" fill="var(--ink)"/></svg> Bắt đầu</span>
+    <span class="item"><svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="none" stroke="var(--ink)" stroke-width="1.6"/><circle cx="8" cy="8" r="4" fill="var(--ink)"/></svg> Kết thúc</span>
+    <span class="item"><svg width="18" height="14"><polygon points="9,1 17,7 9,13 1,7" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.2"/></svg> Quyết định</span>
+  </div>
+
+  <div id="flowsContainer"></div>
+</div>
+
+<script>
+(function(){
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){ var e=document.createElementNS(SVGNS, tag); for(var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function div(cls, html){ var d=document.createElement('div'); d.className=cls; if(html!=null) d.innerHTML=html; return d; }
+
+  /* =========================== SEQUENCE ENGINE =========================== */
+  var ROW_H=46, FRAME_TOP=32, DIV_GAP=30, FRAME_BOTTOM=14, HEAD_H=70, START_Y=96, COL_W=176, LEFT_PAD=100;
+
+  function renderSequence(root, data){
+    var n = data.participants.length;
+    var xs = data.participants.map(function(_,i){ return LEFT_PAD + i*COL_W; });
+    root.innerHTML = '';
+    data.participants.forEach(function(name,i){
+      var h = div('seq-head', name);
+      h.style.left = xs[i]+'px';
+      root.appendChild(h);
+    });
+    var svg = document.createElementNS(SVGNS,'svg');
+    root.appendChild(svg);
+
+    // ---- pass 1: resolve y positions + frame boundaries ----
+    var cursor = START_Y;
+    var stack = [];
+    var frames = [];
+    data.items.forEach(function(item){
+      if(item.type==='msg'){
+        item._y = cursor + ROW_H/2;
+        cursor += ROW_H;
+      } else if(item.type==='frameStart'){
+        var f = { label:item.label, guard:item.guard, startY:cursor, dividers:[], depth:stack.length };
+        stack.push(f);
+        cursor += FRAME_TOP;
+      } else if(item.type==='frameDivider'){
+        var top = stack[stack.length-1];
+        top.dividers.push({ y:cursor, guard:item.guard });
+        cursor += DIV_GAP;
+      } else if(item.type==='frameEnd'){
+        var fr = stack.pop();
+        fr.endY = cursor + FRAME_BOTTOM;
+        cursor = fr.endY;
+        frames.push(fr);
+      }
+    });
+    var totalH = cursor + 24;
+    svg.setAttribute('width', xs[n-1]+140);
+    svg.setAttribute('height', totalH);
+
+    // defs
+    var idFilled = 'seqFilled-'+root.id, idOpen = 'seqOpen-'+root.id;
+    var defs = el('defs',{});
+    var mFilled = el('marker',{ id:idFilled, viewBox:'0 0 10 10', refX:8, refY:5, markerWidth:7, markerHeight:7, orient:'auto' });
+    mFilled.appendChild(el('path',{ d:'M0,0 L10,5 L0,10 Z', fill:'var(--ink)' }));
+    var mOpen = el('marker',{ id:idOpen, viewBox:'0 0 10 10', refX:8, refY:5, markerWidth:7, markerHeight:7, orient:'auto' });
+    mOpen.appendChild(el('path',{ d:'M1,1 L9,5 L1,9', fill:'none', stroke:'var(--ink)', 'stroke-width':1.5 }));
+    defs.appendChild(mFilled); defs.appendChild(mOpen);
+    svg.appendChild(defs);
+
+    // lifelines
+    xs.forEach(function(x){
+      svg.appendChild(el('line',{ x1:x, y1:HEAD_H, x2:x, y2:totalH-10, class:'seq-lifeline' }));
+    });
+
+    // frames (behind messages, transparent fill); nested frames inset per depth
+    var baseX1 = xs[0]-55, baseX2 = xs[n-1]+55;
+    frames.forEach(function(f){
+      var fx1 = baseX1 + f.depth*14, fx2 = baseX2 - f.depth*14;
+      svg.appendChild(el('rect',{ x:fx1, y:f.startY, width:fx2-fx1, height:f.endY-f.startY, class:'seq-frame-rect' }));
+      svg.appendChild(el('path',{ d:'M'+fx1+','+f.startY+' h40 v14 l-8,8 h-32 z', class:'seq-frame-tag' }));
+      var tag = el('text',{ x:fx1+18, y:f.startY+15, 'text-anchor':'middle', class:'seq-frame-tag-text' }); tag.textContent=f.label; svg.appendChild(tag);
+      var g0 = el('text',{ x:fx1+50, y:f.startY+15, class:'seq-guard' }); g0.textContent='['+f.guard+']'; svg.appendChild(g0);
+      f.dividers.forEach(function(d){
+        svg.appendChild(el('line',{ x1:fx1, y1:d.y, x2:fx2, y2:d.y, class:'seq-divider' }));
+        var gt = el('text',{ x:fx1+10, y:d.y+16, class:'seq-guard' }); gt.textContent='['+d.guard+']'; svg.appendChild(gt);
+      });
+    });
+
+    // messages
+    data.items.forEach(function(item){
+      if(item.type!=='msg') return;
+      var y = item._y;
+      var text = item.seq+' : '+item.label;
+      if(item.kind==='self'){
+        var x = xs[item.from];
+        var d = 'M'+x+','+y+' h42 v18 h-42';
+        svg.appendChild(el('path',{ d:d, class:'seq-msg-line', fill:'none', 'marker-end':'url(#'+idFilled+')' }));
+        var t = el('text',{ x:x+48, y:y+13, class:'seq-label' }); t.textContent=text; svg.appendChild(t);
+      } else {
+        var x1=xs[item.from], x2=xs[item.to];
+        var lineClass = item.kind==='return' ? 'seq-return-line' : 'seq-msg-line';
+        var marker = item.kind==='return' ? 'url(#'+idOpen+')' : 'url(#'+idFilled+')';
+        svg.appendChild(el('line',{ x1:x1, y1:y, x2:x2, y2:y, class:lineClass, 'marker-end':marker }));
+        var mx=(x1+x2)/2;
+        var anchor = x2>x1 ? 'middle' : 'middle';
+        var lab = el('text',{ x:mx, y:y-7, 'text-anchor':anchor, class:'seq-label' }); lab.textContent=text; svg.appendChild(lab);
+      }
+    });
+  }
+
+  /* =========================== ACTIVITY ENGINE =========================== */
+  function rectOf(elm, originRect){
+    var r = elm.getBoundingClientRect();
+    return { left:r.left-originRect.left, right:r.right-originRect.left, top:r.top-originRect.top, bottom:r.bottom-originRect.top,
+      cx:(r.left+r.right)/2-originRect.left, cy:(r.top+r.bottom)/2-originRect.top };
+  }
+  function borderPoint(rect, ocx, ocy){
+    var dx=ocx-rect.cx, dy=ocy-rect.cy;
+    var halfW=(rect.right-rect.left)/2, halfH=(rect.bottom-rect.top)/2;
+    if(dx===0 && dy===0) return {x:rect.cx,y:rect.cy};
+    var tx = dx!==0 ? halfW/Math.abs(dx) : Infinity;
+    var ty = dy!==0 ? halfH/Math.abs(dy) : Infinity;
+    var t = Math.min(tx,ty);
+    return { x:rect.cx+dx*t, y:rect.cy+dy*t };
+  }
+
+  function buildActivity(root, data){
+    root.innerHTML = '';
+    var laneHead = div('act-lanes');
+    laneHead.style.gridTemplateColumns = 'repeat('+data.lanes.length+',1fr)';
+    data.lanes.forEach(function(name){ laneHead.appendChild(div('act-lane-head', name)); });
+    root.appendChild(laneHead);
+
+    var maxRow = 0;
+    data.nodes.forEach(function(nd){ if(nd.row>maxRow) maxRow=nd.row; });
+    var grid = div('act-grid');
+    grid.style.gridTemplateColumns = 'repeat('+data.lanes.length+',1fr)';
+    grid.style.gridTemplateRows = 'repeat('+(maxRow+1)+',auto)';
+    var nodeEls = {};
+    data.nodes.forEach(function(nd){
+      var cls = nd.type==='start' ? 'act-start' : nd.type==='end' ? 'act-end' : nd.type==='decision' ? 'act-decision' : 'act-action';
+      var d = document.createElement('div');
+      d.className = 'act-node '+cls;
+      d.style.gridColumn = (nd.lane+1);
+      d.style.gridRow = (nd.row+1);
+      if(nd.label) d.textContent = nd.label;
+      grid.appendChild(d);
+      nodeEls[nd.id] = d;
+    });
+    var svg = document.createElementNS(SVGNS,'svg');
+    grid.appendChild(svg);
+    root.appendChild(grid);
+    return { grid:grid, svg:svg, nodeEls:nodeEls, rootId:root.id };
+  }
+
+  function layoutActivity(ctx, data){
+    var originRect = ctx.grid.getBoundingClientRect();
+    ctx.svg.setAttribute('width', ctx.grid.scrollWidth);
+    ctx.svg.setAttribute('height', ctx.grid.scrollHeight);
+    while(ctx.svg.firstChild) ctx.svg.removeChild(ctx.svg.firstChild);
+    var markerId = 'actArrow-'+ctx.rootId;
+    var defs = el('defs',{});
+    var m = el('marker',{ id:markerId, viewBox:'0 0 10 10', refX:8, refY:5, markerWidth:6.5, markerHeight:6.5, orient:'auto' });
+    m.appendChild(el('path',{ d:'M0,0 L10,5 L0,10 Z', fill:'var(--ink)' }));
+    defs.appendChild(m); ctx.svg.appendChild(defs);
+
+    data.edges.forEach(function(e){
+      var a = ctx.nodeEls[e.from], b = ctx.nodeEls[e.to];
+      if(!a||!b) return;
+      var ra = rectOf(a, originRect), rb = rectOf(b, originRect);
+      var p1 = borderPoint(ra, rb.cx, rb.cy), p2 = borderPoint(rb, ra.cx, ra.cy);
+      ctx.svg.appendChild(el('line',{ x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, class:'act-arrow', 'marker-end':'url(#'+markerId+')' }));
+      if(e.label){
+        var mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+        var w = e.label.length*5.6+8;
+        ctx.svg.appendChild(el('rect',{ x:mx-w/2, y:my-8, width:w, height:16, rx:4, class:'act-edge-label-bg' }));
+        var t = el('text',{ x:mx, y:my+3.5, 'text-anchor':'middle', class:'act-edge-label' }); t.textContent=e.label; ctx.svg.appendChild(t);
+      }
+    });
+  }
+
+  /* =========================== DATA: 5 FLOWS =========================== */
+  function m(seq, from, to, label, kind){ return { type:'msg', seq:seq, from:from, to:to, label:label, kind:kind||'sync' }; }
+  function self(seq, who, label){ return { type:'msg', seq:seq, from:who, to:who, label:label, kind:'self' }; }
+  function altStart(guard){ return { type:'frameStart', label:'alt', guard:guard }; }
+  function loopStart(guard){ return { type:'frameStart', label:'loop', guard:guard }; }
+  function orBranch(guard){ return { type:'frameDivider', guard:guard }; }
+  function frameEnd(){ return { type:'frameEnd' }; }
+
+  var FLOWS = [
+    { key:'f0', title:'Đăng nhập & làm mới phiên đăng nhập (JWT)',
+      seq:{ participants:['Người dùng','Giao diện','Hệ thống','Lưu trữ phiên (DB & Redis)'], items:[
+        m(1,0,1,'Nhập email & mật khẩu'),
+        m(2,1,2,'Gửi yêu cầu đăng nhập'),
+        self(3,2,'Tìm theo email, kiểm tra mật khẩu (hash.verify) & tài khoản đang hoạt động'),
+        altStart('Sai email / mật khẩu hoặc tài khoản bị khoá'),
+          m(4,2,1,'Báo lỗi chung INVALID_CREDENTIALS (không nêu lý do cụ thể)','return'),
+        orBranch('Hợp lệ'),
+          self(5,2,'Tạo access token JWT (sub, role, hết hạn ngắn hạn)'),
+          self(6,2,'Tạo refresh token ngẫu nhiên & băm SHA-256'),
+          m(7,2,3,'Lưu refresh token (familyId, hạn dùng) & lưu bản sao vào Redis (TTL)'),
+          m(8,3,2,'Xác nhận đã lưu','return'),
+          m(9,2,1,'Trả access token + thông tin người dùng; đặt refresh token vào cookie httpOnly','return'),
+          m(10,1,0,'Chuyển vào trang chủ theo vai trò','return'),
+        frameEnd(),
+        m(11,1,2,'(Access token hết hạn) Gửi yêu cầu làm mới token kèm cookie refresh_token'),
+        self(12,2,'Kiểm tra refresh token còn hiệu lực trong Redis & Database, chưa bị thu hồi'),
+        altStart('Không hợp lệ / đã bị thu hồi'),
+          self(13,2,'Nghi ngờ bị đánh cắp: thu hồi toàn bộ họ token (familyId)'),
+          m(14,2,1,'Báo lỗi INVALID_REFRESH_TOKEN, yêu cầu đăng nhập lại','return'),
+        orBranch('Hợp lệ'),
+          m(15,2,3,'Thu hồi token cũ & lưu cặp token mới (cùng familyId)'),
+          m(16,3,2,'Xác nhận đã lưu','return'),
+          m(17,2,1,'Trả access token mới','return'),
+        frameEnd(),
+      ]},
+      act:{ lanes:['Người dùng','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Nhập email & mật khẩu'},
+        {id:'n2',lane:0,row:2,type:'action',label:'Gửi yêu cầu đăng nhập'},
+        {id:'n3',lane:1,row:3,type:'decision',label:'Email / mật khẩu đúng & tài khoản hoạt động?'},
+        {id:'n4',lane:1,row:4,type:'action',label:'Báo lỗi đăng nhập'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Tạo access token & refresh token'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu token vào Database & Redis'},
+        {id:'n7',lane:1,row:7,type:'action',label:'Trả token & chuyển vào trang chủ'},
+        {id:'end',lane:1,row:8,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},
+        {from:'n3',to:'n4',label:'Sai'},{from:'n4',to:'n1'},
+        {from:'n3',to:'n5',label:'Đúng'},{from:'n5',to:'n6'},{from:'n6',to:'n7'},{from:'n7',to:'end'},
+      ]},
+    },
+    { key:'f0b', title:'Quản lý tài khoản người dùng (Admin)',
+      seq:{ participants:['Quản trị viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Thêm người dùng"'),
+        m(2,1,2,'Gọi form thêm người dùng'),
+        m(3,0,1,'Nhập họ tên, email, mật khẩu, vai trò (mã SV nếu là sinh viên)'),
+        m(4,1,2,'Gửi thông tin người dùng mới'),
+        self(5,2,'Kiểm tra dữ liệu, email & mã số SV chưa tồn tại'),
+        altStart('Không hợp lệ / trùng email'),
+          m(6,2,1,'Thông báo lỗi','return'),
+        orBranch('Hợp lệ'),
+          m(7,2,3,'Tạo tài khoản mới (băm mật khẩu)'),
+          m(8,3,2,'Xác nhận đã lưu','return'),
+          m(9,2,1,'Trả về người dùng vừa tạo','return'),
+          m(10,1,0,'Hiển thị trong danh sách người dùng','return'),
+        frameEnd(),
+        m(11,0,1,'Chọn "Sửa" trên một người dùng, nhập thông tin cập nhật'),
+        m(12,1,2,'Gửi thông tin cập nhật'),
+        self(13,2,'Tìm người dùng theo id'),
+        altStart('Không tìm thấy'),
+          m(14,2,1,'Báo lỗi USER_NOT_FOUND','return'),
+        orBranch('Tìm thấy'),
+          m(15,2,3,'Cập nhật thông tin người dùng'),
+          m(16,3,2,'Xác nhận đã lưu','return'),
+          m(17,2,1,'Trả về người dùng đã cập nhật','return'),
+        frameEnd(),
+        m(18,0,1,'Chọn "Đặt lại mật khẩu" hoặc "Vô hiệu hoá"'),
+        m(19,1,2,'Gửi yêu cầu (mật khẩu mới, hoặc đổi trạng thái hoạt động)'),
+        m(20,2,3,'Cập nhật mật khẩu (băm lại) hoặc isActive = false'),
+        m(21,3,2,'Xác nhận đã lưu','return'),
+        m(22,2,1,'Trả kết quả','return'),
+        m(23,1,0,'Hiển thị thông báo thành công','return'),
+      ]},
+      act:{ lanes:['Quản trị viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Mở trang quản lý người dùng'},
+        {id:'n2',lane:0,row:2,type:'decision',label:'Chọn thao tác?'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập thông tin thêm mới & gửi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Hợp lệ & email chưa tồn tại?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Báo lỗi'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Tạo tài khoản mới'},
+        {id:'n7',lane:0,row:7,type:'action',label:'Nhập thông tin cập nhật & gửi'},
+        {id:'n8',lane:1,row:8,type:'action',label:'Cập nhật thông tin'},
+        {id:'n9',lane:0,row:9,type:'action',label:'Gửi yêu cầu đặt lại mật khẩu / vô hiệu hoá'},
+        {id:'n10',lane:1,row:10,type:'action',label:'Cập nhật mật khẩu hoặc trạng thái'},
+        {id:'n11',lane:1,row:11,type:'action',label:'Cập nhật danh sách người dùng'},
+        {id:'end',lane:1,row:12,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},
+        {from:'n2',to:'n3',label:'Thêm mới'},{from:'n3',to:'n4'},{from:'n4',to:'n5',label:'Không'},{from:'n5',to:'n3'},{from:'n4',to:'n6',label:'Có'},
+        {from:'n2',to:'n7',label:'Sửa'},{from:'n7',to:'n8'},
+        {from:'n2',to:'n9',label:'Đặt lại MK / Vô hiệu hoá'},{from:'n9',to:'n10'},
+        {from:'n6',to:'n11'},{from:'n8',to:'n11'},{from:'n10',to:'n11'},{from:'n11',to:'end'},
+      ]},
+    },
+    { key:'f1c', title:'Quản lý danh mục tham chiếu (môn học, chủ đề, thẻ)',
+      seq:{ participants:['Quản trị viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Thêm môn học", nhập mã & tên'),
+        m(2,1,2,'Gửi mã môn & tên môn học'),
+        self(3,2,'Kiểm tra mã môn chưa tồn tại'),
+        altStart('Mã môn đã tồn tại'),
+          m(4,2,1,'Báo lỗi mã môn đã tồn tại','return'),
+        orBranch('Chưa tồn tại'),
+          m(5,2,3,'Lưu môn học mới'),
+          m(6,3,2,'Xác nhận đã lưu','return'),
+          m(7,2,1,'Trả về môn học vừa tạo','return'),
+        frameEnd(),
+        m(8,0,1,'Chọn môn học, thêm chủ đề cho môn'),
+        m(9,1,2,'Gửi tên chủ đề & thứ tự hiển thị'),
+        m(10,2,3,'Lưu chủ đề (gắn subjectId)'),
+        m(11,3,2,'Xác nhận đã lưu','return'),
+        m(12,2,1,'Trả về chủ đề vừa tạo','return'),
+        m(13,0,1,'Chọn "Thêm thẻ gắn nhãn", nhập tên thẻ'),
+        m(14,1,2,'Gửi tên thẻ'),
+        self(15,2,'Tạo slug từ tên thẻ & kiểm tra trùng tên'),
+        altStart('Trùng tên'),
+          m(16,2,1,'Báo lỗi tên thẻ đã tồn tại','return'),
+        orBranch('Hợp lệ'),
+          m(17,2,3,'Lưu thẻ mới (name, slug)'),
+          m(18,3,2,'Xác nhận đã lưu','return'),
+          m(19,2,1,'Trả về thẻ vừa tạo','return'),
+        frameEnd(),
+        m(20,0,1,'Chọn "Xoá môn học"'),
+        m(21,1,2,'Gửi yêu cầu xoá'),
+        m(22,2,3,'Thử xoá môn học'),
+        altStart('Môn học đang được câu hỏi / đề thi tham chiếu'),
+          m(23,3,2,'Báo lỗi ràng buộc khoá ngoại','return'),
+          m(24,2,1,'Báo lỗi SUBJECT_IN_USE','return'),
+        orBranch('Không bị tham chiếu'),
+          m(25,3,2,'Xác nhận đã xoá','return'),
+          m(26,2,1,'Trả về thành công','return'),
+        frameEnd(),
+        m(27,1,0,'Hiển thị danh mục đã cập nhật','return'),
+      ]},
+      act:{ lanes:['Quản trị viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Mở trang danh mục'},
+        {id:'n2',lane:0,row:2,type:'decision',label:'Chọn thao tác?'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập mã & tên môn & gửi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Mã môn chưa tồn tại?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Báo lỗi trùng mã'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu môn học mới'},
+        {id:'n7',lane:0,row:7,type:'action',label:'Chọn môn & nhập tên chủ đề & gửi'},
+        {id:'n8',lane:1,row:8,type:'action',label:'Lưu chủ đề'},
+        {id:'n9',lane:0,row:9,type:'action',label:'Nhập tên thẻ & gửi'},
+        {id:'n10',lane:1,row:10,type:'decision',label:'Tên thẻ chưa tồn tại?'},
+        {id:'n11',lane:1,row:11,type:'action',label:'Báo lỗi trùng tên'},
+        {id:'n12',lane:1,row:12,type:'action',label:'Tạo slug & lưu thẻ'},
+        {id:'n13',lane:0,row:13,type:'action',label:'Chọn môn học cần xoá'},
+        {id:'n14',lane:1,row:14,type:'decision',label:'Đang được câu hỏi / đề thi tham chiếu?'},
+        {id:'n15',lane:1,row:15,type:'action',label:'Báo lỗi không thể xoá'},
+        {id:'end1',lane:1,row:16,type:'end'},
+        {id:'n16',lane:1,row:17,type:'action',label:'Xoá môn học'},
+        {id:'n17',lane:1,row:18,type:'action',label:'Hiển thị danh mục cập nhật'},
+        {id:'end2',lane:1,row:19,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},
+        {from:'n2',to:'n3',label:'Thêm môn học'},{from:'n3',to:'n4'},{from:'n4',to:'n5',label:'Đã tồn tại'},{from:'n5',to:'n3'},{from:'n4',to:'n6',label:'Chưa tồn tại'},
+        {from:'n2',to:'n7',label:'Thêm chủ đề'},{from:'n7',to:'n8'},
+        {from:'n2',to:'n9',label:'Thêm thẻ'},{from:'n9',to:'n10'},{from:'n10',to:'n11',label:'Đã tồn tại'},{from:'n11',to:'n9'},{from:'n10',to:'n12',label:'Chưa tồn tại'},
+        {from:'n2',to:'n13',label:'Xoá môn học'},{from:'n13',to:'n14'},{from:'n14',to:'n15',label:'Có'},{from:'n15',to:'end1'},{from:'n14',to:'n16',label:'Không'},
+        {from:'n6',to:'n17'},{from:'n8',to:'n17'},{from:'n12',to:'n17'},{from:'n16',to:'n17'},{from:'n17',to:'end2'},
+      ]},
+    },
+    { key:'f1d', title:'Quản lý ngân hàng câu hỏi (thêm / sửa / xoá)',
+      seq:{ participants:['Giáo viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Thêm câu hỏi mới"'),
+        m(2,1,2,'Gọi form thêm câu hỏi'),
+        m(3,0,1,'Nhập môn học, chủ đề, loại câu hỏi, độ khó, nội dung, đáp án'),
+        m(4,1,2,'Gửi thông tin câu hỏi'),
+        self(5,2,'Kiểm tra dữ liệu theo loại câu hỏi (trắc nghiệm / đúng-sai / tự luận ngắn)'),
+        altStart('Không hợp lệ'),
+          m(6,2,1,'Thông báo lỗi nhập liệu','return'),
+        orBranch('Hợp lệ'),
+          m(7,2,3,'Lưu câu hỏi (createdBy = giáo viên)'),
+          m(8,2,3,'Lưu các lựa chọn / đáp án theo thứ tự'),
+          m(9,3,2,'Xác nhận đã lưu','return'),
+          m(10,2,1,'Trả về câu hỏi vừa tạo','return'),
+          m(11,1,0,'Hiển thị trong ngân hàng câu hỏi','return'),
+        frameEnd(),
+        m(12,0,1,'Chọn "Sửa" một câu hỏi, nhập nội dung cập nhật'),
+        m(13,1,2,'Gửi nội dung cập nhật'),
+        self(14,2,'Kiểm tra quyền sở hữu câu hỏi (createdBy)'),
+        altStart('Không phải người tạo'),
+          m(15,2,1,'Báo lỗi QUESTION_NOT_FOUND (ẩn tồn tại)','return'),
+        orBranch('Là người tạo'),
+          m(16,2,3,'Xoá & tạo lại lựa chọn / đáp án, cập nhật nội dung'),
+          m(17,3,2,'Xác nhận đã lưu','return'),
+          m(18,2,1,'Trả về câu hỏi đã cập nhật','return'),
+        frameEnd(),
+        m(19,0,1,'Chọn "Xoá" một câu hỏi'),
+        m(20,1,2,'Gửi yêu cầu xoá'),
+        self(21,2,'Kiểm tra quyền sở hữu câu hỏi'),
+        altStart('Không phải người tạo'),
+          m(22,2,1,'Báo lỗi QUESTION_NOT_FOUND','return'),
+        orBranch('Là người tạo'),
+          m(23,2,3,'Thử xoá câu hỏi'),
+          altStart('Câu hỏi đang được dùng trong đề thi'),
+            m(24,3,2,'Báo lỗi ràng buộc khoá ngoại','return'),
+            m(25,2,1,'Báo lỗi QUESTION_IN_USE','return'),
+          orBranch('Không bị dùng'),
+            m(26,3,2,'Xác nhận đã xoá','return'),
+            m(27,2,1,'Trả về thành công','return'),
+          frameEnd(),
+        frameEnd(),
+        m(28,1,0,'Hiển thị ngân hàng câu hỏi cập nhật','return'),
+      ]},
+      act:{ lanes:['Giáo viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Mở ngân hàng câu hỏi'},
+        {id:'n2',lane:0,row:2,type:'decision',label:'Chọn thao tác?'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập nội dung & đáp án & gửi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Dữ liệu hợp lệ theo loại câu hỏi?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Báo lỗi nhập liệu'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu câu hỏi & đáp án'},
+        {id:'n7',lane:0,row:7,type:'action',label:'Chọn câu hỏi của mình & nhập cập nhật'},
+        {id:'n8',lane:1,row:8,type:'action',label:'Cập nhật nội dung & đáp án'},
+        {id:'n9',lane:0,row:9,type:'action',label:'Chọn câu hỏi của mình cần xoá'},
+        {id:'n10',lane:1,row:10,type:'decision',label:'Đang dùng trong đề thi nào?'},
+        {id:'n11',lane:1,row:11,type:'action',label:'Báo lỗi không thể xoá'},
+        {id:'end1',lane:1,row:12,type:'end'},
+        {id:'n12',lane:1,row:13,type:'action',label:'Xoá câu hỏi'},
+        {id:'n13',lane:1,row:14,type:'action',label:'Hiển thị ngân hàng câu hỏi cập nhật'},
+        {id:'end2',lane:1,row:15,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},
+        {from:'n2',to:'n3',label:'Thêm mới'},{from:'n3',to:'n4'},{from:'n4',to:'n5',label:'Không'},{from:'n5',to:'n3'},{from:'n4',to:'n6',label:'Có'},
+        {from:'n2',to:'n7',label:'Sửa'},{from:'n7',to:'n8'},
+        {from:'n2',to:'n9',label:'Xoá'},{from:'n9',to:'n10'},{from:'n10',to:'n11',label:'Có'},{from:'n11',to:'end1'},{from:'n10',to:'n12',label:'Không'},
+        {from:'n6',to:'n13'},{from:'n8',to:'n13'},{from:'n12',to:'n13'},{from:'n13',to:'end2'},
+      ]},
+    },
+    { key:'f1', title:'Tạo đề thi, thêm câu hỏi & xuất bản đề',
+      seq:{ participants:['Giáo viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Tạo đề thi mới"'),
+        m(2,1,2,'Gọi form tạo đề thi'),
+        m(3,0,1,'Nhập môn học, tiêu đề, thời lượng, tổng điểm'),
+        m(4,1,2,'Gửi thông tin đề thi'),
+        self(5,2,'Kiểm tra dữ liệu hợp lệ (createExamValidator)'),
+        altStart('Không hợp lệ'),
+          m(6,2,1,'Thông báo lỗi nhập liệu','return'),
+        orBranch('Hợp lệ'),
+          m(7,2,3,'Lưu đề thi (status = draft, createdBy = giáo viên)'),
+          m(8,3,2,'Xác nhận đã lưu','return'),
+          m(9,2,1,'Trả về đề thi vừa tạo','return'),
+          m(10,1,0,'Hiển thị trang soạn đề thi','return'),
+        frameEnd(),
+        m(11,0,1,'Chọn câu hỏi từ ngân hàng thêm vào đề'),
+        m(12,1,2,'Gửi yêu cầu thêm câu hỏi (questionId, score)'),
+        self(13,2,'Kiểm tra quyền sở hữu đề & đề đang ở trạng thái Nháp'),
+        altStart('Không phải chủ sở hữu hoặc đề không ở trạng thái Nháp'),
+          m(14,2,1,'Báo lỗi EXAM_NOT_FOUND / EXAM_NOT_EDITABLE','return'),
+        orBranch('Hợp lệ'),
+          self(15,2,'Kiểm tra câu hỏi đã có trong đề (exam_questions)'),
+          altStart('Đã tồn tại trong đề'),
+            m(16,2,1,'Báo lỗi QUESTION_ALREADY_IN_EXAM','return'),
+          orBranch('Chưa tồn tại'),
+            m(17,2,3,'Lưu exam_questions (orderIndex = max + 1)'),
+            m(18,3,2,'Xác nhận đã lưu','return'),
+            m(19,2,1,'Trả về danh sách câu hỏi cập nhật','return'),
+            m(20,1,0,'Hiển thị danh sách câu hỏi trong đề','return'),
+          frameEnd(),
+        frameEnd(),
+        m(21,0,1,'Chọn "Xuất bản đề thi"'),
+        m(22,1,2,'Gửi yêu cầu xuất bản'),
+        self(23,2,'Kiểm tra đang ở trạng thái Nháp & đề có ít nhất 1 câu hỏi'),
+        altStart('Đã xuất bản hoặc chưa có câu hỏi'),
+          m(24,2,1,'Báo lỗi EXAM_ALREADY_PUBLISHED / EXAM_HAS_NO_QUESTIONS','return'),
+        orBranch('Hợp lệ'),
+          m(25,2,3,'Cập nhật status = published, tạo exam_variants (GOC)'),
+          m(26,3,2,'Xác nhận đã lưu','return'),
+          m(27,2,1,'Trả về đề thi đã xuất bản','return'),
+          m(28,1,0,'Hiển thị trạng thái "Đã xuất bản"','return'),
+        frameEnd(),
+      ]},
+      act:{ lanes:['Giáo viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Truy cập trang & chọn "Tạo đề thi mới"'},
+        {id:'n2',lane:1,row:2,type:'action',label:'Hiển thị form tạo đề thi'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập thông tin & gửi đề thi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Dữ liệu hợp lệ?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Thông báo lỗi nhập liệu'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu đề thi (trạng thái Nháp)'},
+        {id:'n7',lane:0,row:7,type:'action',label:'Chọn câu hỏi từ ngân hàng thêm vào đề'},
+        {id:'n8',lane:1,row:8,type:'decision',label:'Câu hỏi đã có trong đề?'},
+        {id:'n9',lane:1,row:9,type:'action',label:'Báo lỗi trùng câu hỏi'},
+        {id:'n10',lane:1,row:10,type:'action',label:'Lưu câu hỏi vào đề thi'},
+        {id:'n11',lane:0,row:11,type:'decision',label:'Xuất bản đề thi?'},
+        {id:'n12',lane:1,row:12,type:'action',label:'Kiểm tra có ít nhất 1 câu hỏi & xuất bản'},
+        {id:'end',lane:1,row:13,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n3',to:'n4'},
+        {from:'n4',to:'n5',label:'Sai'},{from:'n5',to:'n3'},
+        {from:'n4',to:'n6',label:'Đúng'},{from:'n6',to:'n7'},{from:'n7',to:'n8'},
+        {from:'n8',to:'n9',label:'Có'},{from:'n9',to:'n7'},
+        {from:'n8',to:'n10',label:'Chưa có'},{from:'n10',to:'n11'},
+        {from:'n11',to:'n12',label:'Có'},{from:'n12',to:'end'},{from:'n11',to:'end',label:'Không'},
+      ]},
+    },
+    { key:'f2', title:'Tạo phòng thi & thêm thí sinh',
+      seq:{ participants:['Giáo viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Tạo phòng thi" cho đề đã xuất bản'),
+        m(2,1,2,'Gọi form tạo phòng thi'),
+        m(3,0,1,'Nhập tên phòng, thời gian mở / đóng'),
+        m(4,1,2,'Gửi thông tin phòng thi'),
+        self(5,2,'Kiểm tra đề đã xuất bản & thời gian hợp lệ'),
+        altStart('Không hợp lệ'),
+          m(6,2,1,'Báo lỗi (chưa xuất bản / thời gian sai)','return'),
+        orBranch('Hợp lệ'),
+          m(7,2,3,'Lưu phòng thi'),
+          m(8,3,2,'Xác nhận đã lưu','return'),
+          m(9,2,1,'Trả về phòng thi vừa tạo','return'),
+          m(10,1,0,'Hiển thị trang quản lý thí sinh','return'),
+        frameEnd(),
+        m(11,0,1,'Chọn cách thêm thí sinh'),
+        altStart('Thêm thủ công'),
+          m(12,1,2,'Gửi yêu cầu thêm sinh viên đã chọn'),
+          m(13,2,3,'Lưu thí sinh vào phòng'),
+        orBranch('Nhập từ Excel'),
+          m(14,1,2,'Gửi file danh sách thí sinh'),
+          self(15,2,'Đọc & kiểm tra từng dòng'),
+          m(16,2,3,'Lưu các thí sinh hợp lệ'),
+        frameEnd(),
+        m(17,3,2,'Xác nhận đã lưu','return'),
+        m(18,2,1,'Trả về danh sách thí sinh cập nhật','return'),
+        m(19,1,0,'Hiển thị danh sách thí sinh trong phòng','return'),
+      ]},
+      act:{ lanes:['Giáo viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Mở đề đã xuất bản & chọn "Tạo phòng thi"'},
+        {id:'n2',lane:1,row:2,type:'action',label:'Hiển thị form tạo phòng thi'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập tên phòng, thời gian & gửi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Đề đã xuất bản & thời gian hợp lệ?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Thông báo lỗi'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu phòng thi'},
+        {id:'n7',lane:0,row:7,type:'decision',label:'Chọn cách thêm thí sinh?'},
+        {id:'n8',lane:0,row:8,type:'action',label:'Tìm & chọn sinh viên thủ công'},
+        {id:'n9',lane:1,row:9,type:'action',label:'Lưu thí sinh vào phòng'},
+        {id:'n10',lane:0,row:10,type:'action',label:'Tải file Excel danh sách thí sinh'},
+        {id:'n11',lane:1,row:11,type:'action',label:'Đọc & lưu các dòng hợp lệ'},
+        {id:'n12',lane:1,row:12,type:'action',label:'Hiển thị danh sách thí sinh cập nhật'},
+        {id:'end',lane:1,row:13,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n3',to:'n4'},
+        {from:'n4',to:'n5',label:'Không'},{from:'n5',to:'n3'},
+        {from:'n4',to:'n6',label:'Có'},{from:'n6',to:'n7'},
+        {from:'n7',to:'n8',label:'Thủ công'},{from:'n8',to:'n9'},
+        {from:'n7',to:'n10',label:'Nhập Excel'},{from:'n10',to:'n11'},
+        {from:'n9',to:'n12'},{from:'n11',to:'n12'},{from:'n12',to:'end'},
+      ]},
+    },
+    { key:'f2b', title:'Giáo viên xem kết quả & vi phạm giám sát',
+      seq:{ participants:['Giáo viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Mở đề thi, chọn "Xem kết quả"'),
+        m(2,1,2,'Gửi yêu cầu danh sách lượt thi theo đề'),
+        self(3,2,'Kiểm tra quyền sở hữu đề thi'),
+        altStart('Không phải người tạo đề'),
+          m(4,2,1,'Báo lỗi EXAM_NOT_FOUND','return'),
+        orBranch('Là người tạo đề'),
+          m(5,2,3,'Lấy danh sách lượt thi theo tất cả phòng của đề'),
+          m(6,3,2,'Trả về danh sách lượt thi','return'),
+          m(7,2,1,'Trả về điểm, trạng thái, số vi phạm từng lượt','return'),
+          m(8,1,0,'Hiển thị bảng kết quả','return'),
+        frameEnd(),
+        m(9,0,1,'Chọn xem chi tiết một lượt thi'),
+        m(10,1,2,'Gửi yêu cầu chi tiết lượt thi'),
+        self(11,2,'Kiểm tra quyền sở hữu (qua phòng thi → đề thi)'),
+        altStart('Không có quyền'),
+          m(12,2,1,'Báo lỗi ATTEMPT_NOT_FOUND','return'),
+        orBranch('Có quyền'),
+          m(13,2,3,'Lấy câu trả lời & điểm từng câu'),
+          m(14,3,2,'Trả về dữ liệu','return'),
+          m(15,2,1,'Trả về chi tiết đáp án & điểm','return'),
+          m(16,1,0,'Hiển thị bài làm chi tiết','return'),
+        frameEnd(),
+        m(17,0,1,'Chọn "Xem vi phạm giám sát" của lượt thi'),
+        m(18,1,2,'Gửi yêu cầu danh sách vi phạm'),
+        m(19,2,3,'Lấy danh sách violation_logs theo lượt thi'),
+        m(20,3,2,'Trả về danh sách vi phạm (loại, thời điểm)','return'),
+        m(21,2,1,'Trả về danh sách vi phạm','return'),
+        m(22,1,0,'Hiển thị danh sách vi phạm giám sát','return'),
+      ]},
+      act:{ lanes:['Giáo viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Mở đề thi & chọn "Xem kết quả"'},
+        {id:'n2',lane:1,row:2,type:'decision',label:'Là người tạo đề?'},
+        {id:'n3',lane:1,row:3,type:'action',label:'Báo lỗi không có quyền'},
+        {id:'end1',lane:1,row:4,type:'end'},
+        {id:'n4',lane:1,row:5,type:'action',label:'Lấy & hiển thị danh sách lượt thi'},
+        {id:'n5',lane:0,row:6,type:'action',label:'Chọn xem chi tiết một lượt thi'},
+        {id:'n6',lane:1,row:7,type:'action',label:'Lấy & hiển thị đáp án chi tiết'},
+        {id:'n7',lane:0,row:8,type:'decision',label:'Xem thêm vi phạm giám sát?'},
+        {id:'n8',lane:1,row:9,type:'action',label:'Lấy & hiển thị danh sách vi phạm'},
+        {id:'end2',lane:1,row:10,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},
+        {from:'n2',to:'n3',label:'Không'},{from:'n3',to:'end1'},
+        {from:'n2',to:'n4',label:'Có'},{from:'n4',to:'n5'},{from:'n5',to:'n6'},{from:'n6',to:'n7'},
+        {from:'n7',to:'n8',label:'Có'},{from:'n8',to:'end2'},{from:'n7',to:'end2',label:'Không'},
+      ]},
+    },
+    { key:'f3', title:'Làm bài thi & nộp bài',
+      seq:{ participants:['Sinh viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn đề thi trong danh sách được giao'),
+        m(2,1,2,'Gửi yêu cầu bắt đầu làm bài'),
+        self(3,2,'Khoá dòng phòng thi (forUpdate) & kiểm tra tồn tại'),
+        altStart('Phòng thi không tồn tại'),
+          m(4,2,1,'Báo lỗi EXAM_ROOM_NOT_FOUND','return'),
+        orBranch('Tồn tại'),
+          self(5,2,'Kiểm tra sinh viên có trong exam_room_students'),
+          altStart('Không có trong phòng'),
+            m(6,2,1,'Báo lỗi NOT_IN_ROOM','return'),
+          orBranch('Có trong phòng'),
+            self(7,2,'Kiểm tra thời gian mở/đóng, lượt thi đã tồn tại & đề đã có biến thể'),
+            altStart('Chưa mở / đã đóng / đã có lượt thi / chưa có đề'),
+              m(8,2,1,'Báo lỗi EXAM_NOT_OPEN_YET / EXAM_CLOSED / ATTEMPT_ALREADY_EXISTS / EXAM_HAS_NO_VARIANT','return'),
+            orBranch('Hợp lệ'),
+              m(9,2,3,'Tạo lượt làm bài (deadlineAt = now + thời lượng, status = in_progress)'),
+              m(10,3,2,'Trả về câu hỏi của đề','return'),
+              m(11,2,1,'Trả về đề thi & câu hỏi','return'),
+              m(12,1,0,'Hiển thị giao diện làm bài (đếm ngược đến deadlineAt)','return'),
+            frameEnd(),
+          frameEnd(),
+        frameEnd(),
+        loopStart('Còn thời gian & chưa nộp bài'),
+          m(13,0,1,'Trả lời câu hỏi'),
+          m(14,1,2,'Gửi đáp án (autosave)'),
+          self(15,2,'Kiểm tra còn in_progress & chưa hết deadlineAt'),
+          altStart('Đã đóng hoặc hết giờ'),
+            m(16,2,1,'Báo lỗi ATTEMPT_ALREADY_CLOSED / ATTEMPT_EXPIRED','return'),
+          orBranch('Còn hiệu lực'),
+            m(17,2,3,'Lưu đáp án (updateOrCreate theo questionId)'),
+            m(18,3,2,'Xác nhận đã lưu','return'),
+          frameEnd(),
+        frameEnd(),
+        altStart('Sinh viên bấm Nộp bài'),
+          m(19,0,1,'Nộp bài thi'),
+          m(20,1,2,'Gửi yêu cầu nộp bài'),
+        orBranch('Vi phạm vượt ngưỡng maxViolationCount'),
+          self(21,2,'Ghi nhận vi phạm, so sánh với maxViolationCount'),
+          self(22,2,'Tự động nộp bài (auto_submitted) ở giao dịch riêng'),
+        frameEnd(),
+        self(23,2,'Khoá lượt thi & kiểm tra còn in_progress'),
+        self(24,2,'Chấm điểm từng câu theo loại (trắc nghiệm / đúng-sai / tự luận ngắn)'),
+        m(25,2,3,'Lưu tổng điểm & trạng thái (submitted / expired / auto_submitted)'),
+        m(26,3,2,'Xác nhận đã lưu','return'),
+        m(27,2,1,'Trả kết quả','return'),
+        m(28,1,0,'Hiển thị kết quả làm bài','return'),
+      ]},
+      act:{ lanes:['Sinh viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Xem danh sách đề thi & chọn đề'},
+        {id:'n2',lane:0,row:2,type:'action',label:'Gửi yêu cầu bắt đầu làm bài'},
+        {id:'n3',lane:1,row:3,type:'decision',label:'Phòng thi tồn tại?'},
+        {id:'n4',lane:1,row:4,type:'action',label:'Báo lỗi: không tìm thấy phòng thi'},
+        {id:'end1',lane:1,row:5,type:'end'},
+        {id:'n5',lane:1,row:6,type:'decision',label:'Sinh viên có trong phòng thi?'},
+        {id:'n6',lane:1,row:7,type:'action',label:'Báo lỗi: không thuộc phòng thi'},
+        {id:'end2',lane:1,row:8,type:'end'},
+        {id:'n7',lane:1,row:9,type:'decision',label:'Còn thời gian, chưa có lượt thi & đã có đề?'},
+        {id:'n8',lane:1,row:10,type:'action',label:'Báo lỗi (chưa mở / đã đóng / đã thi / chưa có đề)'},
+        {id:'end3',lane:1,row:11,type:'end'},
+        {id:'n9',lane:1,row:12,type:'action',label:'Tạo lượt làm bài & trả câu hỏi'},
+        {id:'n10',lane:1,row:13,type:'action',label:'Hiển thị giao diện làm bài'},
+        {id:'n11',lane:0,row:14,type:'action',label:'Trả lời & lưu đáp án'},
+        {id:'n12',lane:1,row:15,type:'decision',label:'Hết giờ hoặc vi phạm vượt ngưỡng?'},
+        {id:'n13',lane:1,row:16,type:'action',label:'Hệ thống tự động nộp bài'},
+        {id:'n14',lane:0,row:17,type:'decision',label:'Sinh viên bấm Nộp bài?'},
+        {id:'n15',lane:0,row:18,type:'action',label:'Gửi yêu cầu nộp bài'},
+        {id:'n16',lane:1,row:19,type:'action',label:'Chấm điểm & lưu kết quả'},
+        {id:'n17',lane:1,row:20,type:'action',label:'Hiển thị kết quả làm bài'},
+        {id:'end4',lane:1,row:21,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},
+        {from:'n3',to:'n4',label:'Không'},{from:'n4',to:'end1'},
+        {from:'n3',to:'n5',label:'Có'},{from:'n5',to:'n6',label:'Không'},{from:'n6',to:'end2'},
+        {from:'n5',to:'n7',label:'Có'},{from:'n7',to:'n8',label:'Không'},{from:'n8',to:'end3'},
+        {from:'n7',to:'n9',label:'Có'},{from:'n9',to:'n10'},{from:'n10',to:'n11'},{from:'n11',to:'n12'},
+        {from:'n12',to:'n13',label:'Có'},
+        {from:'n12',to:'n14',label:'Không'},
+        {from:'n14',to:'n11',label:'Chưa'},
+        {from:'n14',to:'n15',label:'Có'},
+        {from:'n13',to:'n16'},{from:'n15',to:'n16'},
+        {from:'n16',to:'n17'},{from:'n17',to:'end4'},
+      ]},
+    },
+    { key:'f4', title:'Nhập người dùng hàng loạt từ Excel',
+      seq:{ participants:['Quản trị viên','Giao diện','Hệ thống','Database'], items:[
+        m(1,0,1,'Chọn "Tải file mẫu Excel"'),
+        m(2,1,2,'Gửi yêu cầu tải mẫu'),
+        m(3,2,1,'Tạo & trả file mẫu','return'),
+        m(4,1,0,'Lưu file mẫu về máy','return'),
+        self(5,0,'Điền thông tin người dùng vào file mẫu'),
+        m(6,0,1,'Chọn "Nhập từ Excel" & tải file lên'),
+        m(7,1,2,'Gửi file lên hệ thống'),
+        loopStart('Mỗi dòng dữ liệu trong file'),
+          self(8,2,'Đọc & kiểm tra dòng dữ liệu'),
+          altStart('Không hợp lệ / email đã tồn tại'),
+            self(9,2,'Bỏ qua dòng & ghi nhận lỗi'),
+          orBranch('Hợp lệ'),
+            m(10,2,3,'Tạo tài khoản người dùng mới'),
+            m(11,3,2,'Xác nhận đã lưu','return'),
+          frameEnd(),
+        frameEnd(),
+        m(12,2,1,'Trả về kết quả nhập (thành công / bị bỏ qua)','return'),
+        m(13,1,0,'Hiển thị thông báo kết quả nhập','return'),
+      ]},
+      act:{ lanes:['Quản trị viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Chọn "Tải file mẫu Excel"'},
+        {id:'n2',lane:1,row:2,type:'action',label:'Tạo & trả file mẫu'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Điền dữ liệu vào file mẫu'},
+        {id:'n4',lane:0,row:4,type:'action',label:'Tải file lên hệ thống'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Đọc dòng dữ liệu tiếp theo'},
+        {id:'n6',lane:1,row:6,type:'decision',label:'Hợp lệ & email chưa tồn tại?'},
+        {id:'n7',lane:1,row:7,type:'action',label:'Bỏ qua & ghi nhận lỗi'},
+        {id:'n8',lane:1,row:8,type:'action',label:'Tạo tài khoản người dùng mới'},
+        {id:'n9',lane:1,row:9,type:'decision',label:'Còn dòng tiếp theo?'},
+        {id:'n10',lane:1,row:10,type:'action',label:'Hiển thị kết quả nhập'},
+        {id:'end',lane:1,row:11,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n3',to:'n4'},{from:'n4',to:'n5'},{from:'n5',to:'n6'},
+        {from:'n6',to:'n7',label:'Không'},{from:'n6',to:'n8',label:'Có'},
+        {from:'n7',to:'n9'},{from:'n8',to:'n9'},
+        {from:'n9',to:'n5',label:'Còn'},{from:'n9',to:'n10',label:'Hết'},
+        {from:'n10',to:'end'},
+      ]},
+    },
+    { key:'f5', title:'Tải lên tài liệu dùng chung',
+      seq:{ participants:['Giáo viên / QTV','Giao diện','Hệ thống','Lưu trữ file','Database'], items:[
+        m(1,0,1,'Chọn "Tải lên tài liệu"'),
+        m(2,1,2,'Gọi form tải lên'),
+        m(3,0,1,'Nhập tiêu đề, mô tả, chọn môn học, chọn file'),
+        m(4,1,2,'Gửi tài liệu lên hệ thống'),
+        self(5,2,'Kiểm tra định dạng & kích thước file'),
+        altStart('Không hợp lệ'),
+          m(6,2,1,'Báo lỗi định dạng / kích thước','return'),
+        orBranch('Hợp lệ'),
+          m(7,2,3,'Lưu file vào bộ nhớ lưu trữ'),
+          m(8,3,2,'Trả đường dẫn file đã lưu','return'),
+          m(9,2,4,'Lưu thông tin tài liệu'),
+          m(10,4,2,'Xác nhận đã lưu','return'),
+          m(11,2,1,'Trả về tài liệu vừa tạo','return'),
+          m(12,1,0,'Hiển thị tài liệu trong danh sách dùng chung','return'),
+        frameEnd(),
+      ]},
+      act:{ lanes:['Giáo viên / Quản trị viên','Hệ thống'], nodes:[
+        {id:'start',lane:0,row:0,type:'start'},
+        {id:'n1',lane:0,row:1,type:'action',label:'Chọn "Tải lên tài liệu"'},
+        {id:'n2',lane:1,row:2,type:'action',label:'Hiển thị form tải lên'},
+        {id:'n3',lane:0,row:3,type:'action',label:'Nhập thông tin & chọn file, gửi'},
+        {id:'n4',lane:1,row:4,type:'decision',label:'Định dạng & kích thước hợp lệ?'},
+        {id:'n5',lane:1,row:5,type:'action',label:'Thông báo lỗi'},
+        {id:'n6',lane:1,row:6,type:'action',label:'Lưu file vào bộ nhớ lưu trữ'},
+        {id:'n7',lane:1,row:7,type:'action',label:'Lưu thông tin tài liệu vào Database'},
+        {id:'n8',lane:1,row:8,type:'action',label:'Hiển thị trong danh sách tài liệu dùng chung'},
+        {id:'end',lane:1,row:9,type:'end'},
+      ], edges:[
+        {from:'start',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n3',to:'n4'},
+        {from:'n4',to:'n5',label:'Không'},{from:'n5',to:'n3'},
+        {from:'n4',to:'n6',label:'Có'},{from:'n6',to:'n7'},{from:'n7',to:'n8'},{from:'n8',to:'end'},
+      ]},
+    },
+  ];
+
+  /* =========================== BUILD PAGE =========================== */
+  var container = document.getElementById('flowsContainer');
+  var seqFigBase = 9, actFigBase = 18, actSectionBase = 1;
+  var built = [];
+
+  FLOWS.forEach(function(flow, i){
+    var section = div('flow-section');
+    section.appendChild(div('h2-wrap','<h2>'+(i+1)+'. '+flow.title+'</h2>'));
+
+    var seqCard = div('diagram-card');
+    seqCard.innerHTML = '<h3>Biểu đồ trình tự</h3><div class="scroller"><div class="seq-stage" id="'+flow.key+'-seq"></div></div><p class="fig-caption">Hình 3.'+(seqFigBase+i)+': Biểu đồ trình tự '+flow.title+'.</p>';
+    section.appendChild(seqCard);
+
+    var actCard = div('diagram-card');
+    actCard.innerHTML = '<h3>3.3.5.'+(actSectionBase+i+1)+'. Biểu đồ hoạt động '+flow.title+'</h3><div class="scroller"><div class="act-stage" id="'+flow.key+'-act"></div></div><p class="fig-caption">Hình 3.'+(actFigBase+i)+': Biểu đồ hoạt động '+flow.title+'.</p>';
+    section.appendChild(actCard);
+
+    container.appendChild(section);
+    built.push(flow);
+  });
+  container.appendChild(div('hint','Kéo ngang để xem toàn bộ biểu đồ trên màn hình nhỏ.'));
+
+  var activityCtx = {};
+  function buildAll(){
+    built.forEach(function(flow){
+      renderSequence(document.getElementById(flow.key+'-seq'), flow.seq);
+      activityCtx[flow.key] = buildActivity(document.getElementById(flow.key+'-act'), flow.act);
+    });
+  }
+  function layoutAll(){
+    built.forEach(function(flow){ layoutActivity(activityCtx[flow.key], flow.act); });
+  }
+  var builtOnce = false;
+  function runAll(){
+    if(!builtOnce){ buildAll(); builtOnce = true; }
+    requestAnimationFrame(layoutAll);
+  }
+  if(document.readyState === 'complete') runAll();
+  else window.addEventListener('load', runAll);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(runAll);
+  window.addEventListener('resize', layoutAll);
+})();
+</script>

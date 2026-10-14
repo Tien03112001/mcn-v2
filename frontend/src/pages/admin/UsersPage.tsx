@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/api-error'
 import { Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,7 +64,7 @@ export default function UsersPage() {
       setForm({ fullName: '', email: '', password: '', role: 'student', studentCode: '' })
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
-    onError: () => toast.error('Không thể tạo người dùng'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo người dùng')),
   })
 
   const deactivateMutation = useMutation({
@@ -72,7 +73,7 @@ export default function UsersPage() {
       toast.success('Đã vô hiệu hóa người dùng')
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
-    onError: () => toast.error('Không thể vô hiệu hóa người dùng'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể vô hiệu hóa người dùng')),
   })
 
   const reactivateMutation = useMutation({
@@ -81,7 +82,7 @@ export default function UsersPage() {
       toast.success('Đã kích hoạt lại người dùng')
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
-    onError: () => toast.error('Không thể kích hoạt lại người dùng'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể kích hoạt lại người dùng')),
   })
 
   const updateMutation = useMutation({
@@ -97,7 +98,7 @@ export default function UsersPage() {
       setEditing(null)
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
-    onError: () => toast.error('Không thể cập nhật người dùng (email có thể đã tồn tại)'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật người dùng (email có thể đã tồn tại)')),
   })
 
   const importMutation = useMutation({
@@ -107,7 +108,7 @@ export default function UsersPage() {
       toast.success(`Đã nhập ${result.created} người dùng${skippedNote}`)
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
-    onError: () => toast.error('Nhập thất bại. Kiểm tra định dạng file Excel.'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Nhập thất bại. Kiểm tra định dạng file Excel.')),
     onSettled: () => setIsImporting(false),
   })
 

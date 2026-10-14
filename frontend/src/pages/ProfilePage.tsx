@@ -17,10 +17,6 @@ const ROLE_LABEL: Record<UserRole, string> = {
   student: 'Sinh viên',
 }
 
-const CHANGE_PASSWORD_ERROR: Record<string, string> = {
-  INVALID_CURRENT_PASSWORD: 'Mật khẩu hiện tại không đúng.',
-}
-
 function formatDateTime(value: string | null) {
   if (!value) return '—'
   return new Date(value).toLocaleString('vi-VN', {
@@ -43,7 +39,7 @@ export default function ProfilePage() {
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     },
     onError: (error) =>
-      toast.error(getErrorMessage(error, CHANGE_PASSWORD_ERROR, 'Không thể đổi mật khẩu. Vui lòng thử lại.')),
+      toast.error(getErrorMessage(error, 'Không thể đổi mật khẩu. Vui lòng thử lại.')),
   })
 
   const passwordsMismatch = form.newPassword.length > 0 && form.newPassword !== form.confirmPassword

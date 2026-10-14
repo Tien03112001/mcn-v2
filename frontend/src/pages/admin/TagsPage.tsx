@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/api-error'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,7 @@ export default function TagsPage() {
       setName('')
       queryClient.invalidateQueries({ queryKey: ['admin', 'tags'] })
     },
-    onError: () => toast.error('Không thể tạo tag (tên có thể đã tồn tại)'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo tag (tên có thể đã tồn tại)')),
   })
 
   const deleteMutation = useMutation({

@@ -23,10 +23,6 @@ import { createExam, deleteExam, listExams } from '@/lib/api/exams'
 import { getErrorMessage } from '@/lib/api-error'
 import type { ExamStatus } from '@/types/exam'
 
-const DELETE_EXAM_ERROR: Record<string, string> = {
-  EXAM_HAS_ATTEMPTS: 'Không thể xóa: đề thi này đã có học viên làm bài.',
-}
-
 const STATUS_LABEL: Record<ExamStatus, string> = {
   draft: 'Nháp',
   published: 'Đã xuất bản',
@@ -66,7 +62,7 @@ export default function ExamsPage() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'exams'] })
       navigate(`/teacher/exams/${exam.id}`)
     },
-    onError: () => toast.error('Không thể tạo đề thi'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo đề thi')),
   })
 
   const deleteMutation = useMutation({
@@ -75,7 +71,7 @@ export default function ExamsPage() {
       toast.success('Đã xóa đề thi')
       queryClient.invalidateQueries({ queryKey: ['teacher', 'exams'] })
     },
-    onError: (error) => toast.error(getErrorMessage(error, DELETE_EXAM_ERROR, 'Không thể xóa đề thi')),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa đề thi')),
   })
 
   return (

@@ -1,0 +1,895 @@
+<title>Thiết Kế Hệ Thống & CSDL</title>
+<style>
+/*
+  One generic engine (renderGraph) drives every diagram on this page:
+  nodes are real HTML boxes, measured in the DOM, laid out by ELK (layered,
+  orthogonal routing, hierarchical for component/deployment), then edges and
+  their labels are drawn from ELK's computed sections.
+  The database tables (3.4.2) and the ERD (3.4.1) share one data source, so
+  they cannot drift apart. Content mirrors backend/database/migrations after
+  the final migration (1700000029000).
+*/
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --surface-2:#f6f7f9; --ink:#20262e; --ink-dim:#5c6572; --line:#333a44; --accent:#2f5d8a;
+}
+*{box-sizing:border-box;}
+body{ background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; padding-inline:16px; padding-block:28px 48px; display:flex; justify-content:center; margin:0; }
+.page{ width:100%; max-width:1180px; display:flex; flex-direction:column; gap:30px; min-width:0; }
+h1{ font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(21px,4vw,28px); margin:0; letter-spacing:-0.01em; text-wrap:balance; }
+.subtitle{ margin:6px 0 0; color:var(--ink-dim); font-size:14px; max-width:86ch; line-height:1.5; }
+h2{ font-family:'Sora',sans-serif; font-size:18px; margin:0; color:var(--accent); }
+h3{ font-family:'Sora',sans-serif; font-size:15px; margin:0; }
+h4{ font-family:'Sora',sans-serif; font-size:13.5px; margin:0; }
+.section{ display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--line); padding-top:22px; min-width:0; }
+.section:first-of-type{ border-top:none; padding-top:0; }
+.note{ font-size:13px; color:var(--ink-dim); line-height:1.55; margin:0; max-width:90ch; }
+.note code{ font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface-2); padding:1px 4px; border-radius:4px; }
+
+.legend{ display:flex; flex-wrap:wrap; gap:12px 22px; align-items:center; font-size:12px; color:var(--ink-dim); border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:10px 16px; }
+.legend .item{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+
+.diagram-card{ border:1px solid var(--line); border-radius:12px; background:var(--surface); padding:14px 16px 14px; min-width:0; }
+.card-bar{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+.btn{ font:500 12px 'Inter',sans-serif; color:var(--ink); background:var(--surface-2); border:1px solid #c9ced6; border-radius:7px; padding:5px 10px; cursor:pointer; }
+.btn:hover{ background:#e9ecf0; }
+.scroller{ overflow:auto; }
+.fig-caption{ text-align:center; font-size:13px; color:var(--accent); margin:12px 0 0; font-style:italic; }
+.loading{ font-size:12px; color:var(--ink-dim); padding:20px; text-align:center; }
+
+/* ---- graph engine ---- */
+.g-fit{ position:relative; }
+.g-stage{ position:absolute; left:0; top:0; transform-origin:0 0; visibility:hidden; }
+.g-stage.ready{ visibility:visible; }
+.g-stage > svg{ position:absolute; left:0; top:0; overflow:visible; z-index:1; pointer-events:none; }
+.g-node{ position:absolute; left:0; top:0; z-index:2; white-space:nowrap; }
+.g-node.compound{ z-index:0; }
+.g-label{ position:absolute; z-index:3; font-size:10.5px; line-height:1.25; color:var(--ink); white-space:nowrap; padding:0 2px; }
+.g-label.center{ background:var(--surface); text-align:center; }
+.g-label.end{ font-family:'JetBrains Mono',monospace; font-size:10px; }
+.g-edge{ fill:none; stroke:var(--ink); stroke-width:1.25; }
+.g-edge.dashed{ stroke-dasharray:6 4; }
+
+/* UML class */
+.uml-class{ border:1.4px solid var(--ink); background:var(--surface); font-size:11px; min-width:150px; }
+.uml-class .cname{ font-weight:700; text-align:center; padding:6px 10px; border-bottom:1.2px solid var(--ink); font-size:12px; background:var(--surface-2); }
+.uml-class .attrs, .uml-class .ops{ padding:5px 9px; font-family:'JetBrains Mono',monospace; font-size:10.3px; line-height:1.5; }
+.uml-class .ops{ border-top:1.2px solid var(--ink); min-height:12px; }
+.enum-row{ display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; padding-top:14px; border-top:1px dashed #c3c8cf; }
+.enum-row .uml-class{ min-width:0; }
+.enum-row .stereo{ font-weight:400; font-size:10px; color:var(--ink-dim); display:block; }
+
+/* ERD table */
+.er-table{ border:1.4px solid var(--ink); background:var(--surface); font-size:10.5px; min-width:170px; }
+.er-table .tname{ font-weight:700; text-align:center; padding:5px 10px; background:#e4ebf3; border-bottom:1.2px solid var(--ink); font-family:'JetBrains Mono',monospace; font-size:11.3px; }
+.er-table table{ border-collapse:collapse; width:100%; }
+.er-table td{ padding:2px 7px; font-family:'JetBrains Mono',monospace; font-size:10px; line-height:1.45; }
+.er-table td.k{ width:22px; font-weight:700; color:var(--accent); font-size:9px; }
+.er-table td.t{ color:var(--ink-dim); text-align:right; }
+.er-table tr.pk td.n{ font-weight:700; text-decoration:underline; }
+
+/* state */
+.st-state{ border:1.4px solid var(--ink); border-radius:14px; background:var(--surface); padding:9px 16px; text-align:center; font-size:12px; font-weight:600; min-width:130px; }
+.st-state small{ display:block; font-family:'JetBrains Mono',monospace; font-weight:500; font-size:10px; color:var(--ink-dim); margin-top:2px; }
+.st-state .do{ display:block; border-top:1px solid #b9bfc8; margin-top:6px; padding-top:5px; font-weight:400; font-size:10.5px; text-align:left; color:var(--ink); }
+.st-init{ width:22px; height:22px; border-radius:50%; background:var(--ink); }
+.st-final{ width:28px; height:28px; border-radius:50%; border:2px solid var(--ink); display:flex; align-items:center; justify-content:center; background:var(--surface); }
+.st-final::after{ content:""; width:16px; height:16px; border-radius:50%; background:var(--ink); }
+
+/* component */
+.cmp{ position:relative; border:1.4px solid var(--ink); background:var(--surface); padding:8px 34px 8px 12px; font-size:12px; min-width:170px; }
+.cmp .stereo{ display:block; font-size:10px; color:var(--ink-dim); }
+.cmp b{ display:block; font-size:12px; }
+.cmp .tech{ display:block; font-size:10.3px; color:var(--ink-dim); margin-top:2px; }
+.cmp::before, .cmp::after{ content:""; position:absolute; right:10px; width:14px; height:16px; border:1.2px solid var(--ink); top:8px; }
+.cmp::after{ width:8px; height:4px; right:16px; top:11px; border:1.2px solid var(--ink); background:var(--surface); box-shadow:0 6px 0 -0px var(--surface), 0 6px 0 1.2px var(--ink); }
+.pkg{ border:1.4px solid var(--ink); background:var(--surface-2); }
+.pkg .ptitle{ position:absolute; left:0; top:0; padding:6px 12px; font-size:12px; font-weight:700; }
+.pkg .ptitle .stereo{ font-weight:400; font-size:10px; color:var(--ink-dim); margin-right:4px; }
+.ext{ border:1.4px solid var(--ink); background:var(--surface); padding:8px 14px; font-size:12px; text-align:center; min-width:150px; }
+.ext .stereo{ display:block; font-size:10px; color:var(--ink-dim); }
+.ext.db{ border-radius:50% / 14px; padding-top:16px; padding-bottom:12px; }
+
+/* deployment */
+.dep-node{ border:1.4px solid var(--ink); background:var(--surface-2); }
+.dep-node::before{ content:""; position:absolute; left:-1.4px; top:-11.4px; width:100%; height:10px; border:1.4px solid var(--ink); border-bottom:none; transform:skewX(-45deg); transform-origin:0 100%; background:#e7eaee; }
+.dep-node::after{ content:""; position:absolute; right:-11.4px; top:-1.4px; width:10px; height:100%; border:1.4px solid var(--ink); border-left:none; transform:skewY(-45deg); transform-origin:0 0; background:#dde1e6; }
+.dep-node.env{ background:var(--surface); }
+.dep-node .ptitle{ position:absolute; left:0; top:0; padding:6px 12px; font-size:12px; font-weight:700; }
+.dep-node .ptitle .stereo{ display:block; font-weight:400; font-size:10px; color:var(--ink-dim); }
+.dep-node .ptitle .tech{ display:block; font-weight:400; font-size:10.3px; color:var(--ink-dim); }
+.artifact{ position:relative; border:1.4px solid var(--ink); background:var(--surface); padding:7px 30px 7px 11px; font-size:11.5px; min-width:160px; }
+.artifact .stereo{ display:block; font-size:10px; color:var(--ink-dim); }
+.artifact .tech{ display:block; font-size:10.2px; color:var(--ink-dim); }
+.artifact::after{ content:""; position:absolute; right:9px; top:8px; width:11px; height:14px; border:1.1px solid var(--ink); clip-path:polygon(0 0,65% 0,100% 30%,100% 100%,0 100%); background:linear-gradient(225deg,var(--ink) 0 21%,transparent 22%); }
+
+/* data tables */
+.tables{ display:flex; flex-direction:column; gap:26px; }
+.tbl-block{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+.tbl-head{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.tbl-caption{ font-size:13px; color:var(--accent); font-style:italic; margin:0; }
+.tbl-wrap{ overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:10px; }
+table.spec{ border-collapse:collapse; width:100%; font-size:12.5px; min-width:720px; table-layout:fixed; }
+table.spec td{ overflow-wrap:anywhere; }
+table.spec th, table.spec td{ border:1px solid #c3c8cf; padding:6px 10px; text-align:left; vertical-align:top; }
+table.spec tr:first-child th{ border-top:none; }
+table.spec tr > :first-child{ border-left:none; }
+table.spec tr > :last-child{ border-right:none; }
+table.spec tr:last-child td{ border-bottom:none; }
+table.spec th{ background:var(--surface-2); font-weight:600; }
+table.spec td:first-child{ font-family:'JetBrains Mono',monospace; font-size:12px; }
+table.spec td:nth-child(3){ font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+.tbl-extra{ font-size:12px; color:var(--ink-dim); margin:0; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+
+<div class="page">
+  <header>
+    <h1>Thiết kế hệ thống &amp; cơ sở dữ liệu — Hệ thống ngân hàng đề thi &amp; thi online</h1>
+    <p class="subtitle">Viết lại các mục 3.3.6 → 3.4.2 theo đúng code hiện tại: biểu đồ lớp lấy từ <code>backend/app/models</code> và các service; biểu đồ thành phần và triển khai lấy từ cấu trúc <code>frontend/src</code>, <code>backend/app</code> và <code>.env.example</code>; biểu đồ trạng thái lấy từ luật chuyển trạng thái trong controller/service; cơ sở dữ liệu lấy từ toàn bộ migration (19 bảng sau migration cuối). Số hình tiếp nối mẫu: Hình 3.33 → 3.39, Bảng 3.15 → 3.33.</p>
+  </header>
+
+  <!-- ============================ 3.3.6 ============================ -->
+  <section class="section">
+    <h2>3.3.6. Biểu đồ lớp</h2>
+    <div class="legend">
+      <span class="item"><svg width="34" height="10"><line x1="1" y1="5" x2="33" y2="5" stroke="var(--ink)" stroke-width="1.3"/></svg> Liên kết (association)</span>
+      <span class="item"><svg width="38" height="12"><path d="M1,6 L7,2 L13,6 L7,10 Z" fill="var(--ink)"/><line x1="13" y1="6" x2="37" y2="6" stroke="var(--ink)" stroke-width="1.3"/></svg> Hợp thành (composition — xóa cha thì xóa con)</span>
+      <span class="item"><span style="font-family:'JetBrains Mono',monospace">1 · 0..1 · 0..*</span> Bản số (multiplicity)</span>
+      <span class="item"><span style="font-family:'JetBrains Mono',monospace">- thuộc tính / + phương thức</span></span>
+    </div>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="classDiagram">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="classDiagram"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <div class="enum-row" id="enumRow"></div>
+      <p class="fig-caption">Hình 3.33: Biểu đồ lớp.</p>
+    </div>
+    <p class="note">Mỗi lớp tương ứng một model Lucid ORM. Bảng trung gian <code>exam_tags</code> không có thuộc tính riêng nên được biểu diễn bằng liên kết nhiều–nhiều giữa <b>Exam</b> và <b>Tag</b>. Các phương thức là thao tác nghiệp vụ thật của hệ thống (controller/service), ví dụ <code>ExamAttemptService.start/submit</code>, <code>ViolationService.recordViolation</code>, <code>GradingService.grade</code>, <code>AuthService.rotateRefreshToken</code>.</p>
+  </section>
+
+  <!-- ============================ 3.3.7 ============================ -->
+  <section class="section">
+    <h2>3.3.7. Biểu đồ thành phần</h2>
+    <div class="legend">
+      <span class="item"><svg width="38" height="12"><line x1="1" y1="6" x2="30" y2="6" stroke="var(--ink)" stroke-width="1.3" stroke-dasharray="6 4"/><path d="M28,2 L36,6 L28,10" fill="none" stroke="var(--ink)" stroke-width="1.3"/></svg> Phụ thuộc / gọi đến</span>
+      <span class="item">«component» Thành phần phần mềm</span>
+      <span class="item">«subsystem» Phân hệ</span>
+    </div>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="componentDiagram">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="componentDiagram"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.34: Biểu đồ thành phần.</p>
+    </div>
+    <p class="note">Frontend là ứng dụng một trang (SPA) React gọi Backend qua REST API (JSON, xác thực bằng Bearer JWT; refresh token lưu trong cookie httpOnly). Backend AdonisJS xử lý yêu cầu theo chuỗi Router → Middleware → Controller → Validator / Service / Transformer → Model, lưu dữ liệu vào PostgreSQL, dùng Redis cho refresh token và giới hạn tần suất (đăng nhập, nộp bài), và lưu file tải lên vào thư mục <code>storage/uploads</code>.</p>
+  </section>
+
+  <!-- ============================ 3.3.8 ============================ -->
+  <section class="section">
+    <h2>3.3.8. Biểu đồ triển khai</h2>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="deployDiagram">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="deployDiagram"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.35: Biểu đồ triển khai.</p>
+    </div>
+    <p class="note">Repo chưa có cấu hình triển khai (Docker/Nginx), nên biểu đồ mô tả mô hình triển khai mục tiêu dựa trên cấu hình thật: frontend build bằng Vite thành file tĩnh; backend Node.js chạy cổng <code>3333</code>; PostgreSQL cổng <code>5432</code> (CSDL <code>exam_bank_db</code>); Redis cổng <code>6379</code>; file tải lên lưu tại <code>STORAGE_DISK_PATH</code>, tối đa <code>5 MB</code> mỗi file.</p>
+  </section>
+
+  <!-- ============================ 3.3.9 ============================ -->
+  <section class="section">
+    <h2>3.3.9. Biểu đồ trạng thái</h2>
+    <div class="legend">
+      <span class="item"><svg width="14" height="14"><circle cx="7" cy="7" r="7" fill="var(--ink)"/></svg> Trạng thái đầu</span>
+      <span class="item"><svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="none" stroke="var(--ink)" stroke-width="1.6"/><circle cx="8" cy="8" r="4" fill="var(--ink)"/></svg> Trạng thái kết thúc</span>
+      <span class="item"><svg width="38" height="12"><line x1="1" y1="6" x2="30" y2="6" stroke="var(--ink)" stroke-width="1.3"/><path d="M28,2 L36,6 L28,10 Z" fill="var(--ink)"/></svg> Chuyển trạng thái: sự kiện [điều kiện] / hành động</span>
+    </div>
+
+    <h3>3.3.9.1. Biểu đồ trạng thái bài làm</h3>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="stateAttempt">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="stateAttempt"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.36: Biểu đồ trạng thái bài làm.</p>
+    </div>
+    <p class="note">Trạng thái lưu ở cột <code>exam_attempts.status</code>. Hạn nộp <code>deadline_at</code> = thời điểm bắt đầu + <code>duration_minutes</code>, và đồng hồ máy chủ là nguồn quyết định duy nhất. Không có tác vụ nền tự đóng bài: trạng thái <code>expired</code> được gán khi học viên nộp bài sau hạn. Khi đạt <code>max_violation_count</code>, bài làm bị đánh dấu nghi vấn (<code>is_flagged</code>) và tự động nộp. Việc chấm điểm (<code>GradingService</code>) chạy trong cùng transaction với thao tác nộp, ngay trước khi ghi trạng thái cuối, nên được vẽ thành hành động <i>entry</i> của trạng thái kết thúc chứ không phải một trạng thái riêng.</p>
+
+    <h3>3.3.9.2. Biểu đồ trạng thái đề thi</h3>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="stateExam">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="stateExam"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.37: Biểu đồ trạng thái đề thi.</p>
+    </div>
+    <p class="note">Trạng thái lưu ở cột <code>exams.status</code>. Chỉ đề ở trạng thái nháp mới được sửa (<code>EXAM_NOT_EDITABLE</code>) và xuất bản (<code>EXAM_ALREADY_PUBLISHED</code>). Trạng thái <code>archived</code> đã khai báo trong CSDL và có trong thống kê dashboard nhưng chưa có API chuyển sang, nên được vẽ nét đứt.</p>
+
+    <h3>3.3.9.3. Biểu đồ trạng thái phòng thi</h3>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="stateRoom">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="stateRoom"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.38: Biểu đồ trạng thái phòng thi.</p>
+    </div>
+    <p class="note">Trạng thái phòng thi không lưu thành cột mà được suy ra từ <code>opens_at</code>/<code>closes_at</code> so với thời gian hiện tại (bộ lọc <code>upcoming</code> / <code>open</code> / <code>closed</code> ở trang danh sách bài thi của học viên).</p>
+  </section>
+
+  <!-- ============================ 3.4 ============================ -->
+  <section class="section">
+    <h2>3.4. Thiết kế cơ sở dữ liệu</h2>
+    <h3>3.4.1. Liên kết giữa các bảng</h3>
+    <div class="legend">
+      <span class="item"><svg width="44" height="14"><line x1="1" y1="7" x2="43" y2="7" stroke="var(--ink)" stroke-width="1.3"/><line x1="5" y1="1" x2="5" y2="13" stroke="var(--ink)" stroke-width="1.3"/><line x1="10" y1="1" x2="10" y2="13" stroke="var(--ink)" stroke-width="1.3"/></svg> Một và chỉ một</span>
+      <span class="item"><svg width="44" height="14"><line x1="1" y1="7" x2="43" y2="7" stroke="var(--ink)" stroke-width="1.3"/><line x1="5" y1="1" x2="5" y2="13" stroke="var(--ink)" stroke-width="1.3"/><circle cx="14" cy="7" r="4" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.3"/></svg> Không hoặc một (khóa ngoại cho phép NULL)</span>
+      <span class="item"><svg width="44" height="14"><line x1="1" y1="7" x2="43" y2="7" stroke="var(--ink)" stroke-width="1.3"/><circle cx="26" cy="7" r="4" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.3"/><path d="M31,7 L43,1 M31,7 L43,13" stroke="var(--ink)" stroke-width="1.3"/></svg> Không hoặc nhiều</span>
+      <span class="item"><b style="color:var(--accent)">PK</b> Khóa chính · <b style="color:var(--accent)">FK</b> Khóa ngoại</span>
+    </div>
+    <div class="diagram-card">
+      <div class="card-bar"><button class="btn" data-zoom="erDiagram">Xem kích thước thật</button></div>
+      <div class="scroller"><div id="erDiagram"><div class="loading">Đang dựng biểu đồ…</div></div></div>
+      <p class="fig-caption">Hình 3.39: Liên kết giữa các bảng.</p>
+    </div>
+
+    <h3>3.4.2. Thiết kế chi tiết</h3>
+    <p class="note">Hệ quản trị CSDL: PostgreSQL. Kiểu <code>ENUM</code> được Knex tạo dưới dạng cột văn bản kèm ràng buộc CHECK. Mỗi bảng có nút <b>Sao chép</b> để dán thẳng vào Word, giữ nguyên đường kẻ bảng.</p>
+    <div class="tables" id="tables"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){ var e=document.createElementNS(SVGNS, tag); for(var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function div(cls, html){ var d=document.createElement('div'); if(cls) d.className=cls; if(html!=null) d.innerHTML=html; return d; }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* ============================ GRAPH ENGINE ============================ */
+  var BASE_OPTS = {
+    'elk.algorithm':'layered',
+    'elk.edgeRouting':'ORTHOGONAL',
+    'elk.hierarchyHandling':'INCLUDE_CHILDREN',
+    'elk.layered.nodePlacement.strategy':'BRANDES_KOEPF',
+    'elk.layered.considerModelOrder.strategy':'NODES_AND_EDGES',
+    'elk.spacing.edgeEdge':'12',
+    'elk.spacing.edgeNode':'18',
+    'elk.spacing.edgeLabel':'3',
+    'elk.spacing.labelNode':'6',
+    'elk.layered.spacing.edgeEdgeBetweenLayers':'12',
+    'elk.layered.spacing.edgeNodeBetweenLayers':'18'
+  };
+
+  function addMarkers(svg, uid){
+    var defs = el('defs',{});
+    function marker(id, w, h, refX, refY, viewBox, children){
+      var m = el('marker',{ id:id+'-'+uid, viewBox:viewBox, refX:refX, refY:refY, markerWidth:w, markerHeight:h, markerUnits:'userSpaceOnUse', orient:'auto-start-reverse' });
+      children.forEach(function(c){ m.appendChild(c); });
+      defs.appendChild(m);
+    }
+    var ink='var(--ink)', sw=1.3;
+    marker('arrow', 11, 10, 10, 5, '0 0 10 10', [ el('path',{ d:'M0,0 L10,5 L0,10 Z', fill:ink }) ]);
+    marker('open', 12, 11, 10, 5, '0 0 10 10', [ el('path',{ d:'M0.5,0.5 L10,5 L0.5,9.5', fill:'none', stroke:ink, 'stroke-width':1.3 }) ]);
+    marker('diamond', 15, 10, 15, 5, '0 0 15 10', [ el('path',{ d:'M0,5 L7.5,0.5 L15,5 L7.5,9.5 Z', fill:ink }) ]);
+    marker('one', 22, 14, 22, 7, '0 0 22 14', [ el('line',{ x1:0, y1:7, x2:22, y2:7, stroke:ink, 'stroke-width':sw }), el('line',{ x1:11, y1:1, x2:11, y2:13, stroke:ink, 'stroke-width':sw }), el('line',{ x1:16, y1:1, x2:16, y2:13, stroke:ink, 'stroke-width':sw }) ]);
+    marker('zeroOne', 26, 14, 26, 7, '0 0 26 14', [ el('line',{ x1:0, y1:7, x2:26, y2:7, stroke:ink, 'stroke-width':sw }), el('circle',{ cx:8, cy:7, r:4, fill:'var(--surface)', stroke:ink, 'stroke-width':sw }), el('line',{ x1:19, y1:1, x2:19, y2:13, stroke:ink, 'stroke-width':sw }) ]);
+    marker('many', 28, 14, 28, 7, '0 0 28 14', [ el('line',{ x1:0, y1:7, x2:28, y2:7, stroke:ink, 'stroke-width':sw }), el('circle',{ cx:8, cy:7, r:4, fill:'var(--surface)', stroke:ink, 'stroke-width':sw }), el('path',{ d:'M14,7 L28,1 M14,7 L28,13', stroke:ink, 'stroke-width':sw, fill:'none' }) ]);
+    svg.appendChild(defs);
+  }
+
+  var graphs = {};
+  var uidSeq = 0;
+
+  function renderGraph(hostId, spec){
+    var host = document.getElementById(hostId);
+    var uid = 'g'+(++uidSeq);
+    host.innerHTML = '';
+    var fit = div('g-fit'); var stage = div('g-stage');
+    fit.appendChild(stage); host.appendChild(fit);
+
+    var nodeEls = {};
+    var childrenOf = {};
+    spec.nodes.forEach(function(n){
+      var p = n.parent || 'root';
+      (childrenOf[p] = childrenOf[p] || []).push(n);
+    });
+    spec.nodes.forEach(function(n){
+      var d = div('g-node ' + (n.cls||'') + (childrenOf[n.id] ? ' compound' : ''), n.html);
+      stage.appendChild(d);
+      nodeEls[n.id] = d;
+    });
+
+    var labelEls = [];
+    function mkLabel(text, kind){
+      var d = div('g-label ' + kind, text);
+      stage.appendChild(d);
+      labelEls.push(d);
+      return { el:d, id:'l'+labelEls.length };
+    }
+
+    function elkNode(n){
+      var o = { id:n.id };
+      var kids = childrenOf[n.id];
+      if(kids){
+        o.children = kids.map(elkNode);
+        o.layoutOptions = Object.assign({ 'elk.padding':'[top='+(n.padTop||44)+',left=18,bottom=18,right='+(n.padRight||18)+']' }, n.opts||{});
+      } else {
+        o.width = Math.ceil(nodeEls[n.id].offsetWidth);
+        o.height = Math.ceil(nodeEls[n.id].offsetHeight);
+      }
+      return o;
+    }
+
+    var labelMap = {};
+    var edges = spec.edges.map(function(e, i){
+      var o = { id:uid+'e'+i, sources:[e.from], targets:[e.to], labels:[] };
+      [['label','center','CENTER'],['tail','end','TAIL'],['head','end','HEAD']].forEach(function(t){
+        if(e[t[0]]){
+          var l = mkLabel(e[t[0]], t[1]);
+          labelMap[o.id+l.id] = l.el;
+          o.labels.push({ id:o.id+l.id, text:e[t[0]], width:Math.ceil(l.el.offsetWidth)+2, height:Math.ceil(l.el.offsetHeight), layoutOptions:{ 'elk.edgeLabels.placement':t[2] } });
+        }
+      });
+      return o;
+    });
+
+    var graph = {
+      id:'root',
+      layoutOptions:Object.assign({}, BASE_OPTS, spec.opts||{}),
+      children:(childrenOf.root||[]).map(elkNode),
+      edges:edges
+    };
+
+    return new ELK().layout(graph).then(function(g){
+      var abs = { root:{ x:0, y:0 } };
+      (function walk(list, ox, oy){
+        (list||[]).forEach(function(c){
+          var a = { x:ox+c.x, y:oy+c.y };
+          abs[c.id] = a;
+          var d = nodeEls[c.id];
+          d.style.left = a.x+'px'; d.style.top = a.y+'px';
+          if(c.children){ d.style.width = c.width+'px'; d.style.height = c.height+'px'; }
+          walk(c.children, a.x, a.y);
+        });
+      })(g.children, 0, 0);
+
+      var W = Math.ceil(g.width)+24, H = Math.ceil(g.height)+24;
+      var svg = el('svg',{ width:W, height:H });
+      addMarkers(svg, uid);
+      stage.insertBefore(svg, stage.firstChild);
+
+      (g.edges||[]).forEach(function(ge, i){
+        var spec_e = spec.edges[i];
+        var off = abs[ge.container] || abs.root;
+        (ge.sections||[]).forEach(function(s){
+          var pts = [s.startPoint].concat(s.bendPoints||[], [s.endPoint]);
+          var d = pts.map(function(p,k){ return (k?'L':'M')+(p.x+off.x).toFixed(1)+','+(p.y+off.y).toFixed(1); }).join(' ');
+          var attrs = { d:d, 'class':'g-edge'+(spec_e.dashed?' dashed':'') };
+          if(spec_e.start) attrs['marker-start'] = 'url(#'+spec_e.start+'-'+uid+')';
+          if(spec_e.end) attrs['marker-end'] = 'url(#'+spec_e.end+'-'+uid+')';
+          svg.appendChild(el('path', attrs));
+        });
+        (ge.labels||[]).forEach(function(l){
+          var d = labelMap[l.id];
+          if(!d) return;
+          d.style.left = (l.x+off.x)+'px'; d.style.top = (l.y+off.y)+'px';
+        });
+      });
+
+      stage.style.width = W+'px'; stage.style.height = H+'px';
+      graphs[hostId] = { fit:fit, stage:stage, W:W, H:H, actual:false };
+      applyFit(hostId);
+      stage.classList.add('ready');
+    });
+  }
+
+  function applyFit(hostId){
+    var gr = graphs[hostId]; if(!gr) return;
+    var avail = gr.fit.parentNode.parentNode.clientWidth || gr.W;
+    var s = gr.actual ? 1 : Math.min(1, avail / gr.W);
+    gr.stage.style.transform = 'scale('+s+')';
+    gr.fit.style.width = (gr.W*s)+'px';
+    gr.fit.style.height = (gr.H*s)+'px';
+  }
+  window.addEventListener('resize', function(){ Object.keys(graphs).forEach(applyFit); });
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-zoom]'); if(!b) return;
+    var gr = graphs[b.getAttribute('data-zoom')]; if(!gr) return;
+    gr.actual = !gr.actual;
+    b.textContent = gr.actual ? 'Thu vừa khung' : 'Xem kích thước thật';
+    applyFit(b.getAttribute('data-zoom'));
+  });
+
+  /* ============================ 3.3.6 CLASS ============================ */
+  function umlClass(name, attrs, ops){
+    return '<div class="uml-class"><div class="cname">'+name+'</div><div class="attrs">'+attrs.map(function(a){ return '- '+esc(a); }).join('<br>')+'</div><div class="ops">'+(ops||[]).map(function(o){ return '+ '+esc(o); }).join('<br>')+'</div></div>';
+  }
+  var CLASSES = [
+    ['User', ['id: int','fullName: string','email: string','password: string','role: Role','studentCode: string','isActive: boolean','createdAt: DateTime','updatedAt: DateTime'],
+      ['login(email, password)','logout()','changePassword(current, new)','resetPassword()','importFromExcel(file)','deactivate()']],
+    ['RefreshToken', ['id: int','userId: int','tokenHash: string','familyId: uuid','isRevoked: boolean','expiresAt: DateTime','createdAt: DateTime'],
+      ['issueForLogin(user)','rotate(rawToken)','revoke(rawToken)','revokeFamily(familyId)']],
+    ['Subject', ['id: int','code: string','name: string','description: string','createdAt: DateTime','updatedAt: DateTime'],
+      ['create()','update()','delete()']],
+    ['Topic', ['id: int','subjectId: int','name: string','orderIndex: int'],
+      ['create()','update()','delete()']],
+    ['Tag', ['id: int','name: string','slug: string'],
+      ['create()','update()','delete()']],
+    ['Question', ['id: int','subjectId: int','topicId: int','createdBy: int','questionType: QuestionType','difficulty: Difficulty','content: string','explanation: string','answerConfig: json','isActive: boolean'],
+      ['create()','update()','delete()','grade(payload, maxScore)']],
+    ['QuestionOption', ['id: int','questionId: int','label: string','content: string','isCorrect: boolean','orderIndex: int'], []],
+    ['QuestionPart', ['id: int','questionId: int','label: string','content: string','isCorrect: boolean','orderIndex: int'], []],
+    ['FileAttachment', ['id: int','questionId: int','examId: int','fileName: string','storedPath: string','mimeType: string','sizeBytes: int','uploadedBy: int'],
+      ['upload(file)','download()','delete()']],
+    ['Exam', ['id: int','subjectId: int','createdBy: int','title: string','description: string','durationMinutes: int','totalScore: decimal','maxViolationCount: int','shuffleQuestions: boolean','shuffleOptions: boolean','generationMode: GenerationMode','status: ExamStatus'],
+      ['create()','update()','delete()','publish()']],
+    ['ExamQuestion', ['id: int','examId: int','questionId: int','orderIndex: int','score: decimal'],
+      ['addQuestion()','updateScore()','removeQuestion()']],
+    ['ExamVariant', ['id: int','examId: int','variantCode: string','questionOrderMap: json','optionOrderMap: json'], []],
+    ['ExamRoom', ['id: int','examId: int','name: string','opensAt: DateTime','closesAt: DateTime','createdBy: int'],
+      ['create()','update()','delete()']],
+    ['ExamRoomStudent', ['id: int','examRoomId: int','studentId: int','addedAt: DateTime'],
+      ['addStudents(ids)','importFromExcel(file)','remove()']],
+    ['ExamAttempt', ['id: int','examRoomId: int','examVariantId: int','studentId: int','startedAt: DateTime','deadlineAt: DateTime','submittedAt: DateTime','status: AttemptStatus','score: decimal','violationCount: int','isFlagged: boolean'],
+      ['start(examRoomId, studentId)','questionsForAttempt()','saveAnswer(questionId, payload)','submit(finalStatus)','recordViolation(type)']],
+    ['ExamAttemptAnswer', ['id: int','examAttemptId: int','questionId: int','answerPayload: json','isCorrect: boolean','scoreAwarded: decimal','answeredAt: DateTime'], []],
+    ['ViolationLog', ['id: int','examAttemptId: int','violationType: ViolationType','occurredAt: DateTime','clientReportedAt: DateTime','metadata: json'], []],
+    ['Document', ['id: int','title: string','description: string','subjectId: int','fileName: string','storedPath: string','mimeType: string','sizeBytes: int','uploadedBy: int','createdAt: DateTime'],
+      ['upload(file)','download()','delete()']]
+  ];
+  // [from(1 side), to(many side), kind, tailMult, headMult, label]
+  var CLASS_LINKS = [
+    ['User','RefreshToken','comp','1','0..*'],
+    ['User','Question','assoc','1','0..*','tạo'],
+    ['User','Exam','assoc','1','0..*','tạo'],
+    ['User','ExamRoom','assoc','1','0..*','tạo'],
+    ['User','ExamRoomStudent','comp','1','0..*','được xếp vào'],
+    ['User','ExamAttempt','comp','1','0..*','làm bài'],
+    ['User','Document','assoc','1','0..*','tải lên'],
+    ['User','FileAttachment','assoc','1','0..*','tải lên'],
+    ['Subject','Topic','comp','1','0..*'],
+    ['Subject','Question','assoc','1','0..*'],
+    ['Subject','Exam','assoc','1','0..*'],
+    ['Subject','Document','assoc','0..1','0..*'],
+    ['Topic','Question','assoc','0..1','0..*'],
+    ['Question','QuestionOption','comp','1','0..*'],
+    ['Question','QuestionPart','comp','1','0..*'],
+    ['Question','FileAttachment','comp','0..1','0..*'],
+    ['Question','ExamQuestion','assoc','1','0..*'],
+    ['Question','ExamAttemptAnswer','assoc','1','0..*'],
+    ['Exam','ExamQuestion','comp','1','0..*'],
+    ['Exam','ExamVariant','comp','1','1..*'],
+    ['Exam','Tag','assoc','0..*','0..*'],
+    ['Exam','FileAttachment','comp','0..1','0..*'],
+    ['Exam','ExamRoom','comp','1','0..*'],
+    ['ExamRoom','ExamRoomStudent','comp','1','0..*'],
+    ['ExamRoom','ExamAttempt','assoc','1','0..*'],
+    ['ExamVariant','ExamAttempt','assoc','1','0..*'],
+    ['ExamAttempt','ExamAttemptAnswer','comp','1','0..*'],
+    ['ExamAttempt','ViolationLog','comp','1','0..*']
+  ];
+  var ENUMS = [
+    ['Role', ['admin','teacher','student']],
+    ['QuestionType', ['single_choice','multiple_choice','true_false_group','short_answer']],
+    ['Difficulty', ['easy','medium','hard']],
+    ['GenerationMode', ['manual','matrix_random']],
+    ['ExamStatus', ['draft','published','archived']],
+    ['AttemptStatus', ['in_progress','submitted','auto_submitted','expired']],
+    ['ViolationType', ['tab_hidden','window_blur','fullscreen_exit']]
+  ];
+  document.getElementById('enumRow').innerHTML = ENUMS.map(function(e){
+    return '<div class="uml-class"><div class="cname"><span class="stereo">«enumeration»</span>'+e[0]+'</div><div class="attrs">'+e[1].join('<br>')+'</div></div>';
+  }).join('');
+
+  /* ======================== 3.3.7 COMPONENT ======================== */
+  function cmp(name, tech){ return '<div class="cmp"><span class="stereo">«component»</span><b>'+name+'</b><span class="tech">'+tech+'</span></div>'; }
+  function pkg(stereo, name){ return '<div class="ptitle"><span class="stereo">'+stereo+'</span>'+name+'</div>'; }
+  function ext(stereo, name, cls){ return '<div class="ext '+(cls||'')+'"><span class="stereo">'+stereo+'</span><b>'+name+'</b></div>'; }
+
+  var COMPONENT = {
+    opts:{ 'elk.direction':'DOWN', 'elk.spacing.nodeNode':'30', 'elk.layered.spacing.nodeNodeBetweenLayers':'44' },
+    nodes:[
+      { id:'fe', cls:'pkg', html:pkg('«subsystem»','Frontend — React SPA (Vite)'), padTop:40 },
+      { id:'feRouter', parent:'fe', html:cmp('Router &amp; Route Guard','React Router · routes/') },
+      { id:'fePages', parent:'fe', html:cmp('Pages','pages/admin · teacher · student · auth') },
+      { id:'feUi', parent:'fe', html:cmp('UI Components','shadcn/ui · Tailwind CSS · sonner') },
+      { id:'feHooks', parent:'fe', html:cmp('Hooks','use-auth · use-countdown · use-exam-proctoring') },
+      { id:'feQuery', parent:'fe', html:cmp('Server State','TanStack React Query') },
+      { id:'feStore', parent:'fe', html:cmp('Auth Store','Zustand · accessToken, user') },
+      { id:'feApi', parent:'fe', html:cmp('API Client','Axios · lib/api/* · tự làm mới token') },
+
+      { id:'be', cls:'pkg', html:pkg('«subsystem»','Backend — AdonisJS (Node.js)'), padTop:40 },
+      { id:'beRouter', parent:'be', html:cmp('Router','start/routes/*.ts · /api/v1') },
+      { id:'beMw', parent:'be', html:cmp('Middleware','auth (JWT) · rbac · limiter') },
+      { id:'beCtrl', parent:'be', html:cmp('Controllers','admin · teacher · student · auth · shared') },
+      { id:'beVal', parent:'be', html:cmp('Validators','VineJS') },
+      { id:'beSvc', parent:'be', html:cmp('Services','Auth · ExamAttempt · Grading · Violation · FileStorage') },
+      { id:'beTr', parent:'be', html:cmp('Transformers','định dạng dữ liệu trả về') },
+      { id:'beModel', parent:'be', html:cmp('Models','Lucid ORM · 18 model') },
+
+      { id:'pg', html:ext('«database»','PostgreSQL','db') },
+      { id:'redis', html:ext('«cache»','Redis') },
+      { id:'disk', html:ext('«file storage»','storage/uploads') }
+    ],
+    edges:[
+      { from:'feRouter', to:'fePages' },
+      { from:'fePages', to:'feUi' },
+      { from:'fePages', to:'feHooks' },
+      { from:'fePages', to:'feQuery' },
+      { from:'feHooks', to:'feApi' },
+      { from:'feQuery', to:'feApi' },
+      { from:'feRouter', to:'feStore' },
+      { from:'feApi', to:'feStore' },
+      { from:'feApi', to:'beRouter', label:'HTTPS · REST/JSON<br>Bearer JWT' },
+      { from:'beRouter', to:'beMw' },
+      { from:'beMw', to:'beCtrl' },
+      { from:'beCtrl', to:'beVal' },
+      { from:'beCtrl', to:'beSvc' },
+      { from:'beCtrl', to:'beTr' },
+      { from:'beCtrl', to:'beModel' },
+      { from:'beSvc', to:'beModel' },
+      { from:'beModel', to:'pg', label:'SQL (pg)' },
+      { from:'beSvc', to:'redis', label:'refresh token' },
+      { from:'beMw', to:'redis', label:'rate limit' },
+      { from:'beSvc', to:'disk', label:'đọc/ghi file' }
+    ].map(function(e){ e.dashed = true; e.end = 'open'; return e; })
+  };
+
+  /* ======================== 3.3.8 DEPLOYMENT ======================== */
+  function depTitle(stereo, name, tech){ return '<div class="ptitle"><span class="stereo">'+stereo+'</span>'+name+(tech?'<span class="tech">'+tech+'</span>':'')+'</div>'; }
+  function artifact(name, tech){ return '<div class="artifact"><span class="stereo">«artifact»</span><b>'+name+'</b>'+(tech?'<span class="tech">'+tech+'</span>':'')+'</div>'; }
+
+  var DEPLOY = {
+    opts:{ 'elk.direction':'RIGHT', 'elk.spacing.nodeNode':'40', 'elk.layered.spacing.nodeNodeBetweenLayers':'90' },
+    nodes:[
+      { id:'client', cls:'dep-node', html:depTitle('«device»','Máy tính người dùng','Quản trị viên · Giáo viên · Học viên'), padTop:66, padRight:28 },
+      { id:'browser', parent:'client', cls:'dep-node env', html:depTitle('«execution environment»','Trình duyệt web','Chrome · Edge · Firefox'), padTop:66, padRight:28 },
+      { id:'spa', parent:'browser', html:artifact('Ứng dụng SPA','React · JS/CSS (chạy trên trình duyệt)') },
+
+      { id:'web', cls:'dep-node', html:depTitle('«device»','Máy chủ web','Web server tĩnh (VD: Nginx)'), padTop:66, padRight:28 },
+      { id:'dist', parent:'web', html:artifact('frontend/dist','HTML · JS · CSS (vite build)') },
+
+      { id:'app', cls:'dep-node', html:depTitle('«device»','Máy chủ ứng dụng',''), padTop:50, padRight:28 },
+      { id:'node', parent:'app', cls:'dep-node env', html:depTitle('«execution environment»','Node.js','cổng 3333'), padTop:66, padRight:28 },
+      { id:'api', parent:'node', html:artifact('backend (AdonisJS)','REST API /api/v1') },
+      { id:'uploads', parent:'app', html:artifact('storage/uploads','File đính kèm · tài liệu') },
+
+      { id:'dbs', cls:'dep-node', html:depTitle('«device»','Máy chủ CSDL',''), padTop:50, padRight:28 },
+      { id:'pgsql', parent:'dbs', cls:'dep-node env', html:depTitle('«execution environment»','PostgreSQL','cổng 5432'), padTop:66, padRight:28 },
+      { id:'schema', parent:'pgsql', html:artifact('exam_bank_db','19 bảng') },
+
+      { id:'rds', cls:'dep-node', html:depTitle('«device»','Máy chủ Redis',''), padTop:50, padRight:28 },
+      { id:'redisEnv', parent:'rds', cls:'dep-node env', html:depTitle('«execution environment»','Redis','cổng 6379'), padTop:66, padRight:28 },
+      { id:'redisData', parent:'redisEnv', html:artifact('refresh:* · limiter','token đăng nhập · giới hạn tần suất') }
+    ],
+    edges:[
+      { from:'spa', to:'dist', label:'HTTPS<br>tải giao diện' },
+      { from:'spa', to:'api', label:'HTTPS · REST/JSON<br>JWT + cookie httpOnly' },
+      { from:'api', to:'uploads', label:'đọc/ghi file' },
+      { from:'api', to:'schema', label:'TCP 5432' },
+      { from:'api', to:'redisData', label:'TCP 6379' }
+    ]
+  };
+
+  /* ========================== 3.3.9 STATES ========================== */
+  function st(name, code, act){ return '<div class="st-state">'+name+(code?'<small>'+code+'</small>':'')+(act?'<span class="do">'+act+'</span>':'')+'</div>'; }
+  var INIT = '<div class="st-init"></div>', FINAL = '<div class="st-final"></div>';
+  var STATE_OPTS = { 'elk.direction':'RIGHT', 'elk.spacing.nodeNode':'50', 'elk.layered.spacing.nodeNodeBetweenLayers':'80' };
+  function tr(e){ e.end = e.end || 'arrow'; return e; }
+
+  var STATE_ATTEMPT = {
+    opts:STATE_OPTS,
+    nodes:[
+      { id:'i', html:INIT },
+      { id:'prog', html:st('Đang làm bài','in_progress','do / tự động lưu câu trả lời<br>do / đếm ngược tới deadline_at<br>do / theo dõi rời tab, thoát toàn màn hình') },
+      { id:'sub', html:st('Đã nộp','submitted','entry / chấm điểm, ghi score') },
+      { id:'auto', html:st('Tự động nộp','auto_submitted','entry / is_flagged = true<br>entry / chấm điểm, ghi score') },
+      { id:'exp', html:st('Hết giờ','expired','entry / chấm điểm, ghi score') },
+      { id:'f', html:FINAL }
+    ],
+    edges:[
+      tr({ from:'i', to:'prog', label:'Học viên bắt đầu làm bài<br>[có tên trong phòng ∧ phòng đang mở<br>∧ chưa có bài làm] / tạo bài làm, deadline_at' }),
+      tr({ from:'prog', to:'prog', label:'Vi phạm [số vi phạm &lt; max] / ghi violation_logs' }),
+      tr({ from:'prog', to:'sub', label:'Nộp bài [trước deadline_at]' }),
+      tr({ from:'prog', to:'exp', label:'Nộp bài [sau deadline_at]' }),
+      tr({ from:'prog', to:'auto', label:'Vi phạm [số vi phạm ≥ max_violation_count]' }),
+      tr({ from:'sub', to:'f' }),
+      tr({ from:'exp', to:'f' }),
+      tr({ from:'auto', to:'f' })
+    ]
+  };
+
+  var STATE_EXAM = {
+    opts:STATE_OPTS,
+    nodes:[
+      { id:'i', html:INIT },
+      { id:'draft', html:st('Nháp','draft','Cho phép sửa thông tin,<br>thêm / bớt câu hỏi, đổi điểm') },
+      { id:'pub', html:st('Đã xuất bản','published','Tạo phòng thi, học viên làm bài') },
+      { id:'arch', html:st('Lưu trữ','archived') },
+      { id:'f', html:FINAL }
+    ],
+    edges:[
+      tr({ from:'i', to:'draft', label:'Giáo viên tạo đề thi' }),
+      tr({ from:'draft', to:'draft', label:'Cập nhật đề / thêm, xóa câu hỏi' }),
+      tr({ from:'draft', to:'pub', label:'Xuất bản [có ≥ 1 câu hỏi]<br>/ tạo mã đề GOC' }),
+      tr({ from:'pub', to:'arch', label:'Lưu trữ (chưa có API)', dashed:true }),
+      tr({ from:'draft', to:'f', label:'Xóa đề' }),
+      tr({ from:'pub', to:'f', label:'Xóa đề [chưa có bài làm]' })
+    ]
+  };
+
+  var STATE_ROOM = {
+    opts:STATE_OPTS,
+    nodes:[
+      { id:'i', html:INIT },
+      { id:'up', html:st('Sắp diễn ra','upcoming','now &lt; opens_at') },
+      { id:'open', html:st('Đang mở','open','opens_at ≤ now ≤ closes_at<br>học viên được bắt đầu làm bài') },
+      { id:'closed', html:st('Đã đóng','closed','now &gt; closes_at') },
+      { id:'f', html:FINAL }
+    ],
+    edges:[
+      tr({ from:'i', to:'up', label:'Giáo viên tạo phòng thi<br>[closes_at &gt; opens_at]' }),
+      tr({ from:'up', to:'up', label:'Sửa lịch / thêm, import, xóa học viên' }),
+      tr({ from:'up', to:'open', label:'Đến opens_at' }),
+      tr({ from:'open', to:'closed', label:'Đến closes_at' }),
+      tr({ from:'up', to:'f', label:'Xóa phòng' }),
+      tr({ from:'open', to:'f', label:'Xóa phòng [chưa có bài làm]' }),
+      tr({ from:'closed', to:'f', label:'Xóa phòng [chưa có bài làm]' })
+    ]
+  };
+
+  /* ===================== 3.4 DATABASE (single source) ===================== */
+  // column: [name, description, type, note, key]  key: 'PK' | 'FK:table' | 'FK?:table' (nullable FK)
+  var TS = [['created_at','Thời điểm tạo','TIMESTAMP','Not null'],['updated_at','Thời điểm cập nhật','TIMESTAMP','']];
+  var TABLES = [
+    ['users','Người dùng',[
+      ['id','Mã người dùng','INT','Khóa chính, tự tăng','PK'],
+      ['full_name','Họ và tên','VARCHAR(255)','Not null'],
+      ['email','Email đăng nhập','VARCHAR(254)','Not null, duy nhất'],
+      ['password','Mật khẩu đã băm','VARCHAR(255)','Not null, băm tự động trước khi lưu'],
+      ['role','Vai trò','ENUM','admin | teacher | student'],
+      ['student_code','Mã học viên','VARCHAR(50)','Duy nhất, cho phép NULL (chỉ dùng cho học viên)'],
+      ['is_active','Trạng thái hoạt động','BOOLEAN','Mặc định true; false = đã vô hiệu hóa']
+    ].concat(TS)],
+    ['refresh_tokens','Mã làm mới phiên đăng nhập',[
+      ['id','Mã token','INT','Khóa chính, tự tăng','PK'],
+      ['user_id','Mã người dùng','INT','Khóa ngoại → users(id), ON DELETE CASCADE','FK:users'],
+      ['token_hash','Giá trị băm của refresh token','VARCHAR(255)','Not null, duy nhất'],
+      ['family_id','Mã chuỗi token','UUID','Dùng để thu hồi cả chuỗi khi phát hiện token bị dùng lại'],
+      ['is_revoked','Đã thu hồi','BOOLEAN','Mặc định false'],
+      ['expires_at','Thời điểm hết hạn','TIMESTAMP','Not null (mặc định sau 7 ngày)'],
+      ['created_at','Thời điểm tạo','TIMESTAMP','Not null']
+    ]],
+    ['subjects','Môn học',[
+      ['id','Mã môn học (khóa)','INT','Khóa chính, tự tăng','PK'],
+      ['code','Mã môn học','VARCHAR(50)','Not null, duy nhất'],
+      ['name','Tên môn học','VARCHAR(255)','Not null'],
+      ['description','Mô tả môn học','TEXT','Cho phép NULL']
+    ].concat(TS)],
+    ['topics','Chủ đề',[
+      ['id','Mã chủ đề','INT','Khóa chính, tự tăng','PK'],
+      ['subject_id','Mã môn học','INT','Khóa ngoại → subjects(id), ON DELETE CASCADE','FK:subjects'],
+      ['name','Tên chủ đề','VARCHAR(255)','Not null'],
+      ['order_index','Thứ tự hiển thị','INT','Mặc định 0']
+    ].concat(TS)],
+    ['tags','Thẻ phân loại',[
+      ['id','Mã thẻ','INT','Khóa chính, tự tăng','PK'],
+      ['name','Tên thẻ','VARCHAR(100)','Not null, duy nhất'],
+      ['slug','Tên viết tắt không dấu','VARCHAR(120)','Not null, duy nhất']
+    ].concat(TS)],
+    ['questions','Câu hỏi',[
+      ['id','Mã câu hỏi','INT','Khóa chính, tự tăng','PK'],
+      ['subject_id','Mã môn học','INT','Khóa ngoại → subjects(id), ON DELETE RESTRICT','FK:subjects'],
+      ['topic_id','Mã chủ đề','INT','Khóa ngoại → topics(id), cho phép NULL, ON DELETE SET NULL','FK?:topics'],
+      ['created_by','Giáo viên tạo câu hỏi','INT','Khóa ngoại → users(id), ON DELETE RESTRICT','FK:users'],
+      ['question_type','Loại câu hỏi','ENUM','single_choice | multiple_choice | true_false_group | short_answer'],
+      ['difficulty','Độ khó','ENUM','easy | medium | hard'],
+      ['content','Nội dung câu hỏi','TEXT','Not null'],
+      ['explanation','Lời giải','TEXT','Cho phép NULL'],
+      ['answer_config','Cấu hình đáp án và cách chấm','JSONB','Mặc định {}; VD: đáp số, sai số cho phép, tỉ lệ điểm từng phần'],
+      ['is_active','Trạng thái sử dụng','BOOLEAN','Mặc định true']
+    ].concat(TS)],
+    ['question_options','Phương án trả lời',[
+      ['id','Mã phương án','INT','Khóa chính, tự tăng','PK'],
+      ['question_id','Mã câu hỏi','INT','Khóa ngoại → questions(id), ON DELETE CASCADE','FK:questions'],
+      ['label','Nhãn phương án','VARCHAR(10)','Not null (A, B, C, D…)'],
+      ['content','Nội dung phương án','TEXT','Not null'],
+      ['is_correct','Là đáp án đúng','BOOLEAN','Mặc định false'],
+      ['order_index','Thứ tự hiển thị','INT','Mặc định 0']
+    ]],
+    ['question_parts','Ý của câu hỏi Đúng/Sai',[
+      ['id','Mã ý','INT','Khóa chính, tự tăng','PK'],
+      ['question_id','Mã câu hỏi','INT','Khóa ngoại → questions(id), ON DELETE CASCADE','FK:questions'],
+      ['label','Nhãn ý','VARCHAR(10)','Not null (a, b, c, d)'],
+      ['content','Nội dung ý','TEXT','Not null'],
+      ['is_correct','Ý đúng hay sai','BOOLEAN','Not null'],
+      ['order_index','Thứ tự hiển thị','INT','Mặc định 0']
+    ]],
+    ['file_attachments','Tệp đính kèm',[
+      ['id','Mã tệp','INT','Khóa chính, tự tăng','PK'],
+      ['question_id','Mã câu hỏi','INT','Khóa ngoại → questions(id), cho phép NULL, ON DELETE CASCADE','FK?:questions'],
+      ['exam_id','Mã đề thi','INT','Khóa ngoại → exams(id), cho phép NULL, ON DELETE CASCADE','FK?:exams'],
+      ['file_name','Tên file gốc','VARCHAR(255)','Not null'],
+      ['stored_path','Đường dẫn lưu trên máy chủ','VARCHAR(500)','Not null'],
+      ['mime_type','Kiểu file','VARCHAR(100)','Cho phép NULL'],
+      ['size_bytes','Dung lượng (byte)','BIGINT','Cho phép NULL'],
+      ['uploaded_by','Người tải lên','INT','Khóa ngoại → users(id), ON DELETE RESTRICT','FK:users'],
+      ['created_at','Thời điểm tải lên','TIMESTAMP','Not null']
+    ], 'Ràng buộc CHECK file_attachments_owner_check: mỗi tệp thuộc đúng một trong hai (question_id hoặc exam_id).'],
+    ['exams','Đề thi',[
+      ['id','Mã đề thi','INT','Khóa chính, tự tăng','PK'],
+      ['subject_id','Mã môn học','INT','Khóa ngoại → subjects(id), ON DELETE RESTRICT','FK:subjects'],
+      ['created_by','Giáo viên tạo đề','INT','Khóa ngoại → users(id), ON DELETE RESTRICT','FK:users'],
+      ['title','Tên đề thi','VARCHAR(255)','Not null'],
+      ['description','Mô tả','TEXT','Cho phép NULL'],
+      ['duration_minutes','Thời gian làm bài (phút)','INT','Not null'],
+      ['total_score','Tổng điểm','DECIMAL(6,2)','Mặc định 100'],
+      ['max_violation_count','Số lần vi phạm tối đa','INT','Mặc định 3; đạt ngưỡng thì tự động nộp bài'],
+      ['shuffle_questions','Trộn thứ tự câu hỏi','BOOLEAN','Mặc định false'],
+      ['shuffle_options','Trộn thứ tự phương án','BOOLEAN','Mặc định false'],
+      ['generation_mode','Cách tạo đề','ENUM','manual | matrix_random; mặc định manual'],
+      ['status','Trạng thái đề','ENUM','draft | published | archived; mặc định draft']
+    ].concat(TS)],
+    ['exam_tags','Thẻ của đề thi',[
+      ['id','Mã bản ghi','INT','Khóa chính, tự tăng','PK'],
+      ['exam_id','Mã đề thi','INT','Khóa ngoại → exams(id), ON DELETE CASCADE','FK:exams'],
+      ['tag_id','Mã thẻ','INT','Khóa ngoại → tags(id), ON DELETE CASCADE','FK:tags']
+    ], 'Duy nhất theo cặp (exam_id, tag_id).'],
+    ['exam_questions','Câu hỏi trong đề thi',[
+      ['id','Mã bản ghi','INT','Khóa chính, tự tăng','PK'],
+      ['exam_id','Mã đề thi','INT','Khóa ngoại → exams(id), ON DELETE CASCADE','FK:exams'],
+      ['question_id','Mã câu hỏi','INT','Khóa ngoại → questions(id), ON DELETE RESTRICT','FK:questions'],
+      ['order_index','Thứ tự câu trong đề','INT','Mặc định 0'],
+      ['score','Điểm của câu','DECIMAL(5,2)','Not null']
+    ], 'Duy nhất theo cặp (exam_id, question_id): một câu hỏi chỉ xuất hiện một lần trong một đề.'],
+    ['exam_variants','Mã đề',[
+      ['id','Mã bản ghi','INT','Khóa chính, tự tăng','PK'],
+      ['exam_id','Mã đề thi','INT','Khóa ngoại → exams(id), ON DELETE CASCADE','FK:exams'],
+      ['variant_code','Mã đề','VARCHAR(20)','Not null; mã gốc "GOC" tạo khi xuất bản'],
+      ['question_order_map','Thứ tự câu hỏi sau khi trộn','JSONB','Cho phép NULL (NULL = giữ thứ tự gốc)'],
+      ['option_order_map','Thứ tự phương án sau khi trộn','JSONB','Cho phép NULL'],
+      ['created_at','Thời điểm tạo','TIMESTAMP','Not null']
+    ], 'Duy nhất theo cặp (exam_id, variant_code).'],
+    ['exam_rooms','Phòng thi',[
+      ['id','Mã phòng thi','INT','Khóa chính, tự tăng','PK'],
+      ['exam_id','Mã đề thi','INT','Khóa ngoại → exams(id), ON DELETE CASCADE','FK:exams'],
+      ['name','Tên phòng thi','VARCHAR(255)','Not null'],
+      ['opens_at','Thời điểm mở phòng','TIMESTAMP','Not null'],
+      ['closes_at','Thời điểm đóng phòng','TIMESTAMP','Not null, phải sau opens_at'],
+      ['created_by','Giáo viên tạo phòng','INT','Khóa ngoại → users(id), ON DELETE RESTRICT','FK:users'],
+      ['created_at','Thời điểm tạo','TIMESTAMP','Not null']
+    ]],
+    ['exam_room_students','Học viên trong phòng thi',[
+      ['id','Mã bản ghi','INT','Khóa chính, tự tăng','PK'],
+      ['exam_room_id','Mã phòng thi','INT','Khóa ngoại → exam_rooms(id), ON DELETE CASCADE','FK:exam_rooms'],
+      ['student_id','Mã học viên','INT','Khóa ngoại → users(id), ON DELETE CASCADE','FK:users'],
+      ['added_at','Thời điểm thêm vào phòng','TIMESTAMP','Not null']
+    ], 'Duy nhất theo cặp (exam_room_id, student_id).'],
+    ['exam_attempts','Bài làm',[
+      ['id','Mã bài làm','INT','Khóa chính, tự tăng','PK'],
+      ['exam_room_id','Mã phòng thi','INT','Khóa ngoại → exam_rooms(id), ON DELETE RESTRICT','FK:exam_rooms'],
+      ['exam_variant_id','Mã đề được giao','INT','Khóa ngoại → exam_variants(id), ON DELETE RESTRICT','FK:exam_variants'],
+      ['student_id','Mã học viên','INT','Khóa ngoại → users(id), ON DELETE CASCADE','FK:users'],
+      ['started_at','Thời điểm bắt đầu','TIMESTAMP','Not null'],
+      ['deadline_at','Hạn nộp bài','TIMESTAMP','Not null; = started_at + duration_minutes'],
+      ['submitted_at','Thời điểm nộp','TIMESTAMP','Cho phép NULL'],
+      ['status','Trạng thái bài làm','ENUM','in_progress | submitted | auto_submitted | expired'],
+      ['score','Điểm','DECIMAL(6,2)','Cho phép NULL (có sau khi chấm)'],
+      ['violation_count','Số lần vi phạm','INT','Mặc định 0'],
+      ['is_flagged','Bị đánh dấu nghi vấn','BOOLEAN','Mặc định false']
+    ].concat(TS), 'Duy nhất theo cặp (exam_room_id, student_id): mỗi học viên chỉ làm một lần trong một phòng thi.'],
+    ['exam_attempt_answers','Câu trả lời của bài làm',[
+      ['id','Mã câu trả lời','INT','Khóa chính, tự tăng','PK'],
+      ['exam_attempt_id','Mã bài làm','INT','Khóa ngoại → exam_attempts(id), ON DELETE CASCADE','FK:exam_attempts'],
+      ['question_id','Mã câu hỏi','INT','Khóa ngoại → questions(id), ON DELETE RESTRICT','FK:questions'],
+      ['answer_payload','Nội dung trả lời','JSONB','Not null (phương án chọn / giá trị điền)'],
+      ['is_correct','Đúng hay sai','BOOLEAN','Cho phép NULL (có sau khi chấm)'],
+      ['score_awarded','Điểm đạt được','DECIMAL(5,2)','Cho phép NULL'],
+      ['answered_at','Thời điểm trả lời','TIMESTAMP','Not null']
+    ], 'Duy nhất theo cặp (exam_attempt_id, question_id).'],
+    ['violation_logs','Nhật ký vi phạm',[
+      ['id','Mã vi phạm','INT','Khóa chính, tự tăng','PK'],
+      ['exam_attempt_id','Mã bài làm','INT','Khóa ngoại → exam_attempts(id), ON DELETE CASCADE','FK:exam_attempts'],
+      ['violation_type','Loại vi phạm','ENUM','tab_hidden | window_blur | fullscreen_exit'],
+      ['occurred_at','Thời điểm máy chủ ghi nhận','TIMESTAMP','Not null'],
+      ['client_reported_at','Thời điểm trình duyệt báo','TIMESTAMP','Cho phép NULL'],
+      ['metadata','Thông tin bổ sung','JSONB','Cho phép NULL']
+    ]],
+    ['documents','Tài liệu',[
+      ['id','Mã tài liệu','INT','Khóa chính, tự tăng','PK'],
+      ['title','Tiêu đề tài liệu','VARCHAR(255)','Not null'],
+      ['description','Mô tả','TEXT','Cho phép NULL'],
+      ['subject_id','Mã môn học','INT','Khóa ngoại → subjects(id), cho phép NULL, ON DELETE SET NULL','FK?:subjects'],
+      ['file_name','Tên file gốc','VARCHAR(255)','Not null'],
+      ['stored_path','Đường dẫn lưu trên máy chủ','VARCHAR(500)','Not null'],
+      ['mime_type','Kiểu file','VARCHAR(100)','Cho phép NULL'],
+      ['size_bytes','Dung lượng (byte)','BIGINT','Cho phép NULL'],
+      ['uploaded_by','Người tải lên','INT','Khóa ngoại → users(id), ON DELETE RESTRICT','FK:users'],
+      ['created_at','Thời điểm tải lên','TIMESTAMP','Not null']
+    ]]
+  ];
+
+  // ---- detail tables ----
+  var FIRST_TABLE_NO = 15;
+  var tablesHost = document.getElementById('tables');
+  TABLES.forEach(function(t, i){
+    var no = '3.' + (FIRST_TABLE_NO + i);
+    var heading = '3.4.2.' + (i+1) + '. Bảng ' + t[1] + ' (' + t[0] + ')';
+    var caption = 'Bảng ' + no + ': Bảng ' + t[1] + ' (' + t[0] + ').';
+    var rows = t[2].map(function(c){ return '<tr><td>'+c[0]+'</td><td>'+esc(c[1])+'</td><td>'+c[2]+'</td><td>'+esc(c[3])+'</td></tr>'; }).join('');
+    var block = div('tbl-block',
+      '<h4>'+esc(heading)+'</h4>' +
+      '<div class="tbl-head"><p class="tbl-caption">'+esc(caption)+'</p><button class="btn" data-copy="'+i+'">Sao chép</button></div>' +
+      '<div class="tbl-wrap"><table class="spec"><colgroup><col style="width:20%"><col style="width:25%"><col style="width:14%"><col style="width:41%"></colgroup><tr><th>Tên thuộc tính</th><th>Mô tả</th><th>Kiểu dữ liệu</th><th>Chú thích</th></tr>'+rows+'</table></div>' +
+      (t[3] ? '<p class="tbl-extra">'+esc(t[3])+'</p>' : ''));
+    tablesHost.appendChild(block);
+  });
+
+  // Word-friendly copy: inline borders + Times New Roman so the paste keeps grid lines.
+  function wordHtml(t){
+    var cell = 'border:1px solid #000;padding:3pt 5pt;font-family:\'Times New Roman\';font-size:13pt;vertical-align:top;';
+    var head = ['Tên thuộc tính','Mô tả','Kiểu dữ liệu','Chú thích'].map(function(h){ return '<th style="'+cell+'font-weight:bold;text-align:center;">'+h+'</th>'; }).join('');
+    var body = t[2].map(function(c){ return '<tr>'+[c[0],esc(c[1]),c[2],esc(c[3])].map(function(v){ return '<td style="'+cell+'">'+v+'</td>'; }).join('')+'</tr>'; }).join('');
+    return '<table style="border-collapse:collapse;width:100%;"><tr>'+head+'</tr>'+body+'</table>';
+  }
+  function wordText(t){
+    return ['Tên thuộc tính\tMô tả\tKiểu dữ liệu\tChú thích'].concat(t[2].map(function(c){ return c.slice(0,4).join('\t'); })).join('\n');
+  }
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-copy]'); if(!b) return;
+    var t = TABLES[+b.getAttribute('data-copy')];
+    var html = wordHtml(t), text = wordText(t);
+    function done(ok){ b.textContent = ok ? 'Đã sao chép' : 'Không sao chép được'; setTimeout(function(){ b.textContent = 'Sao chép'; }, 1600); }
+    try {
+      navigator.clipboard.write([ new ClipboardItem({ 'text/html':new Blob([html],{type:'text/html'}), 'text/plain':new Blob([text],{type:'text/plain'}) }) ]).then(function(){ done(true); }, function(){ done(fallback()); });
+    } catch(e){ done(fallback()); }
+    function fallback(){
+      var holder = div('', html); holder.style.position='fixed'; holder.style.left='-9999px';
+      document.body.appendChild(holder);
+      var r = document.createRange(); r.selectNodeContents(holder);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      var ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+      sel.removeAllRanges(); holder.remove();
+      return ok;
+    }
+  });
+
+  // ---- ERD built from the same TABLES ----
+  function erTable(t){
+    var rows = t[2].map(function(c){
+      var k = c[4] ? (c[4] === 'PK' ? 'PK' : 'FK') : '';
+      var type = c[2].replace('VARCHAR','VARCHAR');
+      return '<tr class="'+(k==='PK'?'pk':'')+'"><td class="k">'+k+'</td><td class="n">'+c[0]+'</td><td class="t">'+type+'</td></tr>';
+    }).join('');
+    return '<div class="er-table"><div class="tname">'+t[0]+'</div><table>'+rows+'</table></div>';
+  }
+  var ERD = {
+    opts:{ 'elk.direction':'DOWN', 'elk.spacing.nodeNode':'34', 'elk.layered.spacing.nodeNodeBetweenLayers':'56' },
+    nodes:TABLES.map(function(t){ return { id:t[0], html:erTable(t) }; }),
+    edges:[]
+  };
+  TABLES.forEach(function(t){
+    t[2].forEach(function(c){
+      if(!c[4] || c[4] === 'PK') return;
+      var nullable = c[4].indexOf('FK?') === 0;
+      var parent = c[4].split(':')[1];
+      ERD.edges.push({ from:parent, to:t[0], start:nullable ? 'zeroOne' : 'one', end:'many' });
+    });
+  });
+
+  /* ============================ CLASS GRAPH ============================ */
+  var CLASS = {
+    opts:{ 'elk.direction':'DOWN', 'elk.spacing.nodeNode':'40', 'elk.layered.spacing.nodeNodeBetweenLayers':'64' },
+    nodes:CLASSES.map(function(c){ return { id:c[0], html:umlClass(c[0], c[1], c[2]) }; }),
+    edges:CLASS_LINKS.map(function(l){ return { from:l[0], to:l[1], start:l[2]==='comp' ? 'diamond' : null, tail:l[3], head:l[4], label:l[5] }; })
+  };
+
+  /* ============================== RENDER ============================== */
+  function start(){
+    if(typeof ELK === 'undefined'){
+      document.querySelectorAll('.loading').forEach(function(n){ n.textContent = 'Không tải được thư viện ELK (cần kết nối mạng tới cdn.jsdelivr.net).'; });
+      return;
+    }
+    var jobs = [
+      ['classDiagram', CLASS], ['componentDiagram', COMPONENT], ['deployDiagram', DEPLOY],
+      ['stateAttempt', STATE_ATTEMPT], ['stateExam', STATE_EXAM], ['stateRoom', STATE_ROOM],
+      ['erDiagram', ERD]
+    ];
+    jobs.reduce(function(p, j){ return p.then(function(){ return renderGraph(j[0], j[1]); }).catch(function(err){ console.error(j[0], err); }); }, Promise.resolve());
+  }
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(start);
+})();
+</script>

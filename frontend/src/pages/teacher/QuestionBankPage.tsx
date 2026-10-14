@@ -14,10 +14,6 @@ import { deleteQuestion, listQuestions } from '@/lib/api/questions'
 import { getErrorMessage } from '@/lib/api-error'
 import type { QuestionDifficulty, QuestionType } from '@/types/question'
 
-const DELETE_QUESTION_ERROR: Record<string, string> = {
-  QUESTION_IN_USE: 'Không thể xóa: câu hỏi này đang được dùng trong một đề thi.',
-}
-
 const TYPE_LABEL: Record<QuestionType, string> = {
   single_choice: 'Trắc nghiệm 1 đáp án',
   multiple_choice: 'Trắc nghiệm nhiều đáp án',
@@ -72,7 +68,7 @@ export default function QuestionBankPage() {
       toast.success('Đã xóa câu hỏi')
       queryClient.invalidateQueries({ queryKey: ['teacher', 'questions'] })
     },
-    onError: (error) => toast.error(getErrorMessage(error, DELETE_QUESTION_ERROR, 'Không thể xóa câu hỏi')),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa câu hỏi')),
   })
 
   return (

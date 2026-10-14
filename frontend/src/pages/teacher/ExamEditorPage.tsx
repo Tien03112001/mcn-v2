@@ -30,16 +30,6 @@ import {
   removeExamQuestion,
 } from '@/lib/api/exams'
 
-const CREATE_ROOM_ERROR_MESSAGE: Record<string, string> = {
-  EXAM_NOT_PUBLISHED: 'Đề thi chưa được xuất bản.',
-  INVALID_SCHEDULE: 'Thời gian đóng phải sau thời gian mở.',
-  EXAM_NOT_FOUND: 'Không tìm thấy đề thi.',
-}
-
-const DELETE_ROOM_ERROR_MESSAGE: Record<string, string> = {
-  ROOM_HAS_ATTEMPTS: 'Phòng thi đã có học viên làm bài, không thể xoá.',
-}
-
 export default function ExamEditorPage() {
   const { id } = useParams<{ id: string }>()
   const examId = Number(id)
@@ -75,7 +65,7 @@ export default function ExamEditorPage() {
       refetchExamQuestions()
       setPickerOpen(false)
     },
-    onError: () => toast.error('Không thể thêm câu hỏi'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể thêm câu hỏi')),
   })
 
   const removeQuestionMutation = useMutation({
@@ -89,7 +79,7 @@ export default function ExamEditorPage() {
       toast.success('Đã xuất bản đề thi')
       queryClient.invalidateQueries({ queryKey: ['teacher', 'exams', examId] })
     },
-    onError: () => toast.error('Không thể xuất bản (đề cần ít nhất 1 câu hỏi)'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xuất bản (đề cần ít nhất 1 câu hỏi)')),
   })
 
   const createRoomMutation = useMutation({
@@ -105,7 +95,7 @@ export default function ExamEditorPage() {
       setRoomForm({ name: '', opensAt: '', closesAt: '' })
       refetchExamRooms()
     },
-    onError: (error) => toast.error(getErrorMessage(error, CREATE_ROOM_ERROR_MESSAGE, 'Không thể tạo phòng thi. Vui lòng thử lại.')),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo phòng thi. Vui lòng thử lại.')),
   })
 
   const deleteRoomMutation = useMutation({
@@ -114,7 +104,7 @@ export default function ExamEditorPage() {
       toast.success('Đã xóa phòng thi')
       refetchExamRooms()
     },
-    onError: (error) => toast.error(getErrorMessage(error, DELETE_ROOM_ERROR_MESSAGE, 'Không thể xóa phòng thi')),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa phòng thi')),
   })
 
   if (!exam) return null

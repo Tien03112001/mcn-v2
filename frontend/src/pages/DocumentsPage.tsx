@@ -113,7 +113,7 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ['documents'] })
     },
     onError: (error) =>
-      toast.error(getErrorMessage(error, { INVALID_FILE: 'Định dạng file không được hỗ trợ.' }, 'Không thể tải lên tài liệu')),
+      toast.error(getErrorMessage(error, 'Không thể tải lên tài liệu')),
   })
 
   const deleteMutation = useMutation({
@@ -122,7 +122,7 @@ export default function DocumentsPage() {
       toast.success('Đã xóa tài liệu')
       queryClient.invalidateQueries({ queryKey: ['documents'] })
     },
-    onError: () => toast.error('Không thể xóa tài liệu'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa tài liệu')),
   })
 
   async function handleDownload(id: number, fileName: string) {

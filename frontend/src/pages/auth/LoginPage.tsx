@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { login } from '@/lib/api/auth'
+import { getErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/auth-store'
 import type { UserRole } from '@/types/user'
 
@@ -66,7 +67,9 @@ export default function LoginPage() {
               />
             </div>
             {mutation.isError && (
-              <p className="text-sm text-destructive">Email hoặc mật khẩu không đúng.</p>
+              <p className="text-sm text-destructive">
+                {getErrorMessage(mutation.error, 'Không thể đăng nhập. Vui lòng thử lại.')}
+              </p>
             )}
             <Button type="submit" className="w-full" disabled={mutation.isPending}>
               {mutation.isPending ? 'Đang đăng nhập...' : 'Đăng nhập'}

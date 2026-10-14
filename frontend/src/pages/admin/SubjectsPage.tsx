@@ -17,10 +17,6 @@ import { ConfirmDeleteButton } from '@/components/common/ConfirmDeleteButton'
 import { createSubject, deleteSubject, listSubjects, updateSubject, type Subject } from '@/lib/api/admin'
 import { getErrorMessage } from '@/lib/api-error'
 
-const DELETE_SUBJECT_ERROR: Record<string, string> = {
-  SUBJECT_IN_USE: 'Không thể xóa: môn học này đang được dùng trong câu hỏi hoặc đề thi.',
-}
-
 function formatDateTime(value: string | null) {
   if (!value) return '—'
   return new Date(value).toLocaleString('vi-VN', {
@@ -52,7 +48,7 @@ export default function SubjectsPage() {
       setForm({ code: '', name: '', description: '' })
       queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] })
     },
-    onError: () => toast.error('Không thể tạo môn học (mã môn có thể đã tồn tại)'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo môn học (mã môn có thể đã tồn tại)')),
   })
 
   const updateMutation = useMutation({
@@ -65,7 +61,7 @@ export default function SubjectsPage() {
       setEditing(null)
       queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] })
     },
-    onError: () => toast.error('Không thể cập nhật môn học (mã môn có thể đã tồn tại)'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật môn học (mã môn có thể đã tồn tại)')),
   })
 
   const deleteMutation = useMutation({
@@ -74,7 +70,7 @@ export default function SubjectsPage() {
       toast.success('Đã xóa môn học')
       queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] })
     },
-    onError: (error) => toast.error(getErrorMessage(error, DELETE_SUBJECT_ERROR, 'Không thể xóa môn học')),
+    onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa môn học')),
   })
 
   function openEdit(subject: Subject) {

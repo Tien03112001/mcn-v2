@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useExamProctoring } from '@/hooks/use-exam-proctoring'
 import { saveAnswer, startAttempt, submitAttempt } from '@/lib/api/attempts'
+import { getErrorMessage } from '@/lib/api-error'
 import type { AnswerPayload } from '@/types/attempt'
 
 const AUTOSAVE_DEBOUNCE_MS = 400
@@ -36,8 +37,7 @@ export default function ExamTakingPage() {
   const startMutation = useMutation({
     mutationFn: () => startAttempt(Number(examRoomId)),
     onError: (error: unknown) => {
-      const code = (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(code === 'ATTEMPT_ALREADY_EXISTS' ? 'Bạn đã làm bài thi này rồi' : 'Không thể bắt đầu làm bài')
+      toast.error(getErrorMessage(error, 'Không thể bắt đầu làm bài'))
       navigate('/student')
     },
   })
